@@ -1,0 +1,15 @@
+---
+title: "Report 1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+```
+
+## R Markdown
+```{r}
+data = read.csv("billboard_lyrics_1964-2015.csv")
+```
+
