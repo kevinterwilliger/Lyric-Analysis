@@ -26,7 +26,6 @@ def get_unique_words(lyrics):
     return(len(unique_words),avg,length)
 
 
-
 '''
 This finds the average rhyme length of every song in the table and binds it to
 the original data. Saves new data table to new csv.
