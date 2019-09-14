@@ -9,8 +9,6 @@ library(dplyr)
 library(SentimentAnalysis)
 library(ggplot2)
 library(reticulate)
-use_virtualenv("r-reticulate")
-py_available(FALSE)
 ```
 ## Introduction
 I listen to a lot of music. I've never really had a musical bone in my body so I tend to gravitate toward the lyrics of a song (which is a reason why you'll never find an EDM song in my playlists). After finding a dataset on Kaggle containing the lyrics of Billboard's Hot100 year-end chart from 1964-2015, I decided that it would be interesting to use the lyrics to try to predict a given song's success on the BillBoard Hot100. The Hot100 is just a list of the most popular songs of the given year ranked from 1 (most popular) to 100 (100-most popular).
