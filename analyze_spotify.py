@@ -10,9 +10,7 @@ def similar(a, b):
 def spotify_connect() :
     with open("secrets.json",'r') as f:
         s = json.load(f)
-
     token = util.oauth2.SpotifyClientCredentials(client_id=s["Spotify ID"], client_secret=s["Spotify Secret"])
-
     cache_token = token.get_access_token()
     return spotipy.Spotify(cache_token)
 
@@ -29,14 +27,13 @@ def get_genres(ids) :
 def temp() :
     sp = spotify_connect()
     ret = []
-    s1 = sp.search(q="Searching for sure thing miguel",
+    s1 = sp.search(q="sure thing miguel",
                     limit=10, offset=0, type='track', market=None)
-    print()
     ret.append(s1["tracks"]["items"][0]["album"]["id"])
-    s2 = sp.search(q="Searching for get low lil jon  the east side boyz featuring ying yang twins",
+    s2 = sp.search(q="get low lil jon  the east side boyz featuring ying yang twins",
                     limit=10, offset=0, type='track', market=None)
     ret.append(s2["tracks"]["items"][0]["album"]["id"])
-    s3 = sp.search(q="Searching for just lose it eminem",
+    s3 = sp.search(q="just lose it eminem",
                     limit=10, offset=0, type='track', market=None)
     ret.append(s3["tracks"]["items"][0]["album"]["id"])
     return ret
@@ -53,7 +50,8 @@ def get_search(search,artist,sp) :
             if similar(item['artists'][0]["name"].lower(),artist) > .75 :
                 try :
                     audio = sp.audio_analysis(item["id"])
-                except :
+                except Exception as e:
+                    print(e)
                     l = 9999
                     t = 9999
                     k = 9999
@@ -66,8 +64,10 @@ def get_search(search,artist,sp) :
                 k = sections["key"]
                 m = sections["mode"]
                 time = sections["time_signature"]
+                return l,t,k,m,time
                 # print(artist + " Spotify:  " + item["artists"][0]['name'].lower())
             else :
+                print(e)
                 l = 9999
                 t = 9999
                 k = 9999
@@ -75,6 +75,7 @@ def get_search(search,artist,sp) :
                 time = 9999
             break
     else :
+        print(e)
         l = 9999
         t = 9999
         k = 9999
@@ -108,7 +109,9 @@ def get_analysis(data) :
             else :
                 id = search["tracks"]["items"][0]["album"]["id"]
             l,t,k,m,time,id = get_search(search,artist,sp)
-        except :
+        except Exception as e:
+            print(e)
+
             l = 9999
             t = 9999
             k = 9999
@@ -128,15 +131,18 @@ def get_analysis(data) :
 # ids = temp()
 # print(get_genres(ids))
 data = pd.read_csv("Report1/data_clean.csv")
-l,t,k,m,time,id = get_analysis(data)
+l,t,k,m,time,ids = get_analysis(data)
 columns = pd.DataFrame({
                 'Loudness' : l,
                 'Tempo' : t,
                 'Key' : k,
                 'Mode' : m,
                 'time_signature' : time,
-                'id' : id
+                'id' : ids
 })
 
-data_new = pd.concat([data,columns],axis=1,ignore_index=True)
+data_new = pd.concat([data,columns],axis=1,ignore_index=False)
 data_new.to_csv("Data_new_new.csv")
+# data = pd.read_csv("Data_new_new.csv")
+# for col in data.columns :
+#     print(col)
