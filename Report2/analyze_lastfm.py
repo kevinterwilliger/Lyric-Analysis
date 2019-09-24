@@ -12,12 +12,7 @@ def lastfm_connect() :
 
 def get_genres(data) :
     conn = lastfm_connect()
-    tag1 = []
-    tag2 = []
-    tag3 = []
-    tag4 = []
-    tag5 = []
-    l = [tag1,tag2,tag3,tag4,tag5]
+    l = [[],[],[],[],[]]
 
     for i in range(0,len(data)) :
         try:
@@ -26,20 +21,28 @@ def get_genres(data) :
             q = song + " " + artist
 
             print("searching for " + q)
-            ret = get_tags(artist,song,conn)
+            tags = get_tags(artist,song,conn)
             for i in range(0,4) :
-                l[i].append(ret[i])
-        except Exception as e:
-            print(e)
+                l[i].append(tags[i])
+        except pylast.WSError as e:
+            print("line 33")
+            # raise e
             for i in range(0,4) :
                 l[i].append(9999)
-    return tag1,tag2,tag3,tag4,tag5
+            continue
+    return l
 
 def get_tags(artist,song,conn) :
-    search = conn.get_track(artist=artist,title=song)
-
-    tags = search.get_top_tags()
     l = [9999,9999,9999,9999,9999]
+    try:
+        search = conn.get_track(artist=artist,title=song)
+    except pylast.WSError as e:
+        print("line 46")
+        return l
+    except Exception as e:
+        print("line 49")
+        return l
+    tags = search.get_top_tags()
 
     if len(tags) >= 5 :
         r = 5
@@ -48,20 +51,31 @@ def get_tags(artist,song,conn) :
 
     for j in range(0,r) :
         l[j] = tags[j].item.name
-        
+
     return l
 
 data = pd.read_csv("../Report1/data_clean.csv")
 
-tag1,tag2,tag3,tag4,tag5 = get_genres(data)
+l = get_genres(data)
 # print(tag1)
+print(
+str(len(l[0])) +
+" || " +
+str(len(l[1])) +
+" || " +
+str(len(l[2])) +
+" || " +
+str(len(l[3]))
+)
+
+
 
 columns = pd.DataFrame({
-                'Tag1' : tag1,
-                'Tag2' : tag2,
-                'Tag3' : tag3,
-                'Tag4' : tag4,
-                'Tag5' : tag5
+                'Tag1' : l[0],
+                'Tag2' : l[1],
+                'Tag3' : l[2],
+                'Tag4' : l[3],
+                'Tag5' : l[4]
                 # 'ids' : ids,
                 # 'Genre' : g
 })

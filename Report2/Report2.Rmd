@@ -1,5 +1,5 @@
 ---
-title: "Report2.pdf"
+title: "Terwilliger_Kevin_report2.pdf"
 output: pdf_document
 ---
 
@@ -12,22 +12,23 @@ library(reticulate)
 data = read.csv("Data_new_new.csv",header=T)
 ```
 
-# Report 1
+# Predicting Song Popularity from Characteristics of Lyrics
 
-## Introduction
+## Report 1
+
+### Introduction
 I listen to a lot of music. I've never really had a musical bone in my body so I tend to gravitate toward the lyrics of a song (which is a reason why you'll never find an EDM song in my playlists). After finding a dataset on Kaggle containing the lyrics of Billboard's Hot100 year-end chart from 1964-2015, I decided that it would be interesting to use the lyrics to try to predict a given song's success on the BillBoard Hot100. The Hot100 is just a list of the most popular songs of the given year ranked from 1 (most popular) to 100 (100-most popular).
 
-## Cleaning the data
+### Cleaning the data
 
 Here's what my original data set looked like.
 ```{r}
-original_data = read.csv("billboard_lyrics_1964-2015.csv")
+original_data = read.csv("../Report1/billboard_lyrics_1964-2015.csv")
 names(original_data)
-# I don't know how to stop the lyrics from messing it up
-head(data)
+head(original_data)
 ```
 
-I decided that I wanted to come up with more columns to better interpret lyrics and had to come up with some independet variables on my own. I wrote a python script to help me. The script, which is below, imports the lyrics from the data set and finds the number of words, average word length, average rhyme length, and number of unique words in the given lyrics. 
+I decided that I wanted to come up with more columns to better interpret lyrics and had to come up with some independent variables on my own. I wrote a python script to help me. The script, which is below, imports the lyrics from the data set and finds the number of words, average word length, average rhyme length, and number of unique words in the given lyrics. 
 
 (I would suggest not running this.)
 ```{python, eval=FALSE}
@@ -129,30 +130,30 @@ Here are the Xs broken down:
 3. **Average Rhyme Length** - I had to use a handy library I found to compute this one. I'll link the github at the end, but here's a quick rundown of how it works: &nbsp;
   * Go through lyrics word for word, using eSpeak to get the phonetic make-up of each word.
 
-  * For every word, find the longest matching rhyme senquence from the last 15 words. This is what captures the length of the rhyme. Since eSpeak converts all the words to phonetics (and I think just vowel phonetics) only vowels are compared, which is what gives the program something to match. Essentially, the program searches for the longest matching vowel sequence for last X words, where I used an abitrary 15 words for X.
+  * For every word, find the longest matching rhyme sequence from the last 15 words. This is what captures the length of the rhyme. Since eSpeak converts all the words to phonetics (and I think just vowel phonetics) only vowels are compared, which is what gives the program something to match. Essentially, the program searches for the longest matching vowel sequence for last X words, where I used an arbitrary 15 words for X.
 
   * Find the average rhyme length by summing all the lengths and dividing by the number of rhymes.
 [Here's the github](https://github.com/ekQ/raplysaattori)
 
 4. **Number of Unique Words** - I used python's dictionaries to keep track of the number of unique words in each song. Easy enough.
 
-5. **Sentiment** - I'm not entirely sure what algorithm is used in this package, but I used the analyzeSentiment function from  [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to get each number. The sentiment is a score that gives the general "emotion" score of a word or series of words from -1 to 1.
+5. **Sentiment** - I'm not entirely sure what algorithm is used in this package, but I used the analyzeSentiment function from  [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to get each number. The sentiment is a score that gives the general "emotion" score of a word or series of words from -1 to 1. A negative score correlates to a more negative emotion, whether angry, sad, or both. Positive scores would work in the reverse, the higher the score, the more positive the sentiment expressed in the lyrics is.
  
-## Examing the Data
+### Examine the Data
 
 I'll plot the three most interesting of the X's that I mentioned above: Average Word Length, Average Rhyme Length, and Sentiment. Let's start with Average Word Length.
 
 ```{r}
-data = read.csv("data_clean.csv")
+data = read.csv("../Report1/data_clean.csv")
 plot = ggplot(data,aes(x=AverageWordLength)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
   geom_density(alpha=.2, fill="#FF6666") +
-  labs(title = "Histogram of Average Word Length per Song",x="Number of Words",y="Density") +
+  labs(title = "Histogram of Average Word Length per Song",x="Average Word Length",y="Density") +
   theme_minimal()
 plot
 ```
 
-Next, Average Rhyrme Length.
+From the plot, we can see that the average word length in each song tends to be between 3 letters and 5 letters. I wonder how this histogram differs from the average word length of all english words. My best guess is that this graph is shifted left: not that many songs use words like supercalifragilisticexpialidocious. Next, Average Rhyme Length.
 
 ```{r}
 plot = ggplot(data,aes(x=AverageRhymeLength)) +
@@ -162,6 +163,8 @@ plot = ggplot(data,aes(x=AverageRhymeLength)) +
   theme_minimal()
 plot
 ```
+
+So the average rhyme length in the songs is around 1 vowel-phonetic per rhyme. I am curious to see how this might correlate to genre (as a hip-hop fan, I hope that rap might have longer rhymes than pop or country). 
 
 And Sentiment.
 
@@ -174,7 +177,7 @@ plot = ggplot(data,aes(x=Sentiment)) +
 plot
 ```
 
-and finally, Rank on Billboard Hot100. This is technically a discrete variable, but it has 100 values so a histogram works better. 
+So most songs tend to skew positive, I guess that's not terribly surprising. And finally, Rank on Billboard Hot100. This is technically a discrete variable, but it has 100 values so a histogram works better. 
 
 ```{r}
 plot = ggplot(data,aes(x=Rank)) +
@@ -186,73 +189,150 @@ plot
 # I am curious why the histogram isn't totally uniform, as it should be. TODO: Find out why
 ```
 
-## And Correlation of Variables
+The question above actually has two answers. The first is because this "data" is cleaned to remove any junk values I appended in the script, therefore having less that 50*100 rows and a non-uniform histogram. The other answer I will show below.
 
 ```{r}
-d = data %>% select(.,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
-pairs(d)
+# get the count of every song/artist combination
+proof = data %>%
+  mutate(track = paste(Song,Artist,sep=" ")) %>%
+  group_by(track) %>%
+  summarise(n = n())
+# Checking for duplicates
+proof[proof$n > 1,]
+
 ```
 
-# Report 2
+So there are 195 duplicates. Out of curiosity, are these duplicates an error by whoever created the dataset?
 
-## Introductions
+```{r}
+data$Year[data$Song == "100 pure love"]
+```
+
+I'm going to say that the creator did nothing wrong and that the vast majority, if not all, duplicates are caused by songs being popular for more than just one year. I think I will remove duplicates in the future.
+
+```{r}
+new = data %>%
+  mutate(track = paste(Song,Artist,sep=" "))
+temp = anti_join(new,proof,by="track")
+####AHHHHHHHHHHHHHHHH WHY NO WORK TODO: Fix this shit
+```
+
+
+### Correlation of Variables
+
+```{r,warning=F}
+d = data %>% select(.,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+scatter.smooth(d$Rank ~ d$AverageWordLength,data=d)
+```
+
+Not a high correlation.
+
+```{r}
+scatter.smooth(d$Rank ~ d$AverageRhymeLength)
+```
+
+Agian, low.
+
+```{r}
+scatter.smooth(d$Rank ~ d$Sentiment)
+```
+
+Yeah, so not good. I can't say I'm surprised, but there has got to be a way for me to get better predictions from these variables. First, maybe a binary prediction variable will prove better.
+
+```{r}
+binary = data %>%
+  mutate(Top50 = ifelse(Rank <= 50,1,0)) %>%
+  select(Top50,AverageWordLength,AverageRhymeLength,Sentiment,NumberWords,UniqueWords)
+
+plot = ggplot(binary,aes(x=Top50)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins=100) +
+  geom_density(alpha=.2, fill="#FF6666") +
+  labs(title = "Histogram of Binary Variable Top50",x="Top50",y="Density") +
+  theme_minimal()
+plot
+```
+
+OK good, a 50-50(ish) split is what we wanted.
+
+```{r echo=F,error=F,warning=F}
+boxplot(AverageWordLength ~ Top50,data=binary)
+```
+
+Oof. Not good.
+
+```{r warning=F}
+boxplot(AverageRhymeLength ~ Top50,data=binary)
+```
+
+This is not an improvement.
+
+```{r warning=F}
+boxplot(Sentiment ~ Top50,data=binary)
+```
+
+
+Yeah so not better. In the next report, I will be adding a few more columns, one of them being genre of the song. I will probably try to predict genre from the other columns, hopefully it will work better.
+
+### Concluding Thoughts
+
+I really want to make this project work. So far it seems likely that the linear regressions and logistic regressions in report 2 will prove to be inept at predicting Rank or Top50. As I write this conclusion, I am trying to finalize the script I mentioned above, but it relys on some APIs that are proving to be difficult. I think that trying to predict genre from variables like average rhyme length or unique words might prove more successful than predicting popularity. If the graders have any recommendations on possible Y/X variables, I'd very much appreciate the outside input. Other than that, here is report 2!
+
+## Report 2
+
+### Introductions
 
 *Insert Finished Script*
 
-## Regressions
+### Regressions
 
-I'll just run some regressions on what I currently have...
+Due to the fact that linear regressions for Rank are very underwhelming, I'll include regressions for Rank, Top50 (binary variable), and Genre.
 
-First, Average Word Length.
+Let's start with running some regressions on Rank.
+
+#### Average Word Length
 
 ```{r}
 fit = lm(Rank ~ AverageWordLength, data=data)
 summary(fit)
 ```
 
-Not great. Next, Average Rhyme Length.
+From the above summary, the R-squared of the linear regression of average word length on rank is 0.00005306. This is such a bad R-squared that it is clear that average word length has almost no bearing on how popular a song will be. As a fair warning, it will be like this for all Rank regressions.
+
+#### Average Rhyme Length
 
 ```{r}
 fit = lm(Rank ~ AverageRhymeLength,data=data)
 summary(fit)
 ```
 
+Again, a terrible R-squared. It is interesting, though, that average rhyme length has a slightly negative relationship toward rank.
 
-Again not great. Number of Words.
+#### Number of Words
 
 ```{r}
-fit = lm(Rank ~ NumberWords,data=data)
+fit = lm(Rank ~ NumberWords, data=data)
 summary(fit)
 ```
 
-Yikes. Unique Words.
+I did warn the reader.
+
+#### Number of Unique Words
 
 ```{r}
-fit = lm(Rank ~ UniqueWords,data=data)
+fit = lm(Rank ~ UniqueWords, data = data)
 summary(fit)
 ```
 
-I mean, closer. Sentiment
+This is the most significant variable, it being able to pass a 85% significance test. It is a shame, though, that the R-squared is basically zero.
+
+### Logistic Regressions
+
+Using the Top50 variable generated above, let's see if logistic regressions offer us some better models.
+
+#### Average Word Length
 
 ```{r}
-fit = lm(Rank ~ Sentiment,data=data)
+fit = glm(Top50 ~ AverageWordLength, data=binary)
 summary(fit)
-```
-
-I'm not entirely sure I'm surprised none of these are significant predictors of a song's success, it doesn't seem likely that something like having a large number of unique words in a song will boost a song higher in popularity. I am hoping that some of the variables I am looking to add will prove to be better predictors. For now, maybe I can find a better dependent variable.
-
-Let's try turning Rank into a binary variable: 1-50 being 1 and 51-100 being 0. I'll call it Top50.
-
-```{r}
-new = data %>% mutate(Top50 = ifelse(Rank < 51,1,0))
-
-fit = glm(Top50 ~ UniqueWords,data=new)
-summary(fit)
-```
-
-AHHHHHHHHHHHH SO CLOSE.
-
-```{r}
-new_new = new %>% 
 ```
 
