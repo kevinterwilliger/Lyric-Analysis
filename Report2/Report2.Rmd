@@ -281,7 +281,7 @@ I really want to make this project work. So far it seems likely that the linear 
 
 ### Introductions
 
-*Insert Finished Script*
+*Insert Finished Script* TODO: find featuring artists
 
 ### Regressions
 
