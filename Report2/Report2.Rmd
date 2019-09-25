@@ -4,6 +4,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
+setwd("~/Desktop/GitHub/Econ490/Report2")
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(SentimentAnalysis)
@@ -282,6 +283,7 @@ I really want to make this project work. So far it seems likely that the linear 
 ### Introductions
 
 *Insert Finished Script* TODO: find featuring artists
+
 
 ### Regressions
 
