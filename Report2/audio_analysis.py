@@ -25,30 +25,6 @@ def get_search(search,artist,sp) :
     if len(search['tracks']['items']) is not 0 :
         for item in search["tracks"]["items"] :
             if similar(item['artists'][0]["name"].lower(),artist) > .75 :
-                # id = search["tracks"]["items"][0]["artists"]#["id"]
-                # print(id)
-                # try :
-                #     id = search["tracks"]["items"][0]["artists"][0]["id"]
-                #     # print(id)
-                #     artist = sp.artist(artist_id=id)
-                #     # with open("temp.txt",'w') as f:
-                #     #     json.dump(artist,f)
-                #
-                #     if len(artist["genres"]) is 0:
-                #         g = 9999
-                #     else:
-                #         g = artist['genres'][0]
-                # except Exception as e:
-                #     print("error in genre")
-                #     check(e)
-                #     l = 9999
-                #     t = 9999
-                #     k = 9999
-                #     m = 9999
-                #     time = 9999
-                #     # g = 9999
-                #     # id = 9999
-                #     break
                 try :
                     audio = sp.audio_analysis(item["id"])
                 except Exception as e:
@@ -74,8 +50,6 @@ def get_search(search,artist,sp) :
         k = 9999
         m = 9999
         time = 9999
-        # id = 9999
-        # g = 9999
         return l,t,k,m,time
 
 '''
@@ -90,8 +64,6 @@ def get_analysis(data) :
     key = []
     mode = []
     time_signature = []
-    # genre = []
-    # ids = []
 
     for i in range(0,len(data)) :
         if i % 500 == 0 and i is not 0 :
@@ -118,8 +90,6 @@ def get_analysis(data) :
             k = 9999
             m = 9999
             time = 9999
-            # g = 9999
-            # id = 9999
             flag = False
         if flag:
             try :
@@ -132,28 +102,23 @@ def get_analysis(data) :
                 k = 9999
                 m = 9999
                 time = 9999
-                # g = 9999
-                # id = 9999
         loudness.append(l)
         tempo.append(t)
         key.append(k)
         mode.append(m)
         time_signature.append(time)
-        # genre.append(g)
-        # ids.append(id)
-
     return loudness,tempo,key,mode,time_signature
 
 def check(exception) :
     try:
-        print(e)
-        print(type(e))
+        print(exception)
+        print(type(exception))
     except:
-        print("did not work")
+        print(exception)
     try:
-        print(e.keys())
+        print(exception.keys())
     except:
-        print("oof")
+        return
 
 data = pd.read_csv("../Report1/data_clean.csv")
 # thefacththatihavetodothis(data)

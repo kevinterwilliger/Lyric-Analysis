@@ -11,6 +11,10 @@ def lastfm_connect() :
                                    api_secret=s["Last.FM secret"])
     return network
 
+
+'''
+Returns list of 5 top user tags from Last_FM API for each song in dataset
+'''
 def get_genres(data) :
     conn = lastfm_connect()
     l = [[],[],[],[],[],[]]
@@ -30,7 +34,6 @@ def get_genres(data) :
                     l[i].append(9999)
         except pylast.WSError as e:
             print("line 33")
-            # raise e
             for i in range(0,len(l)) :
                 l[i].append(9999)
             continue
