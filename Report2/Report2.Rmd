@@ -4,16 +4,21 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-setwd("~/Desktop/GitHub/Econ490/Report2")
+#setwd("~/Desktop/GitHub/Econ490/Report2")
+setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report2")
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
+library(stringr)
 library(SentimentAnalysis)
 library(ggplot2)
-library(reticulate)
+library(dotwhisker)
+#library(reticulate)
 data = read.csv("Data_new_new.csv",header=T)
 ```
 
 # Predicting Song Popularity from Characteristics of Lyrics
+
+[(Click here to skip to Report 2.)][Report2]  
 
 ## Report 1
 
@@ -31,85 +36,10 @@ head(original_data)
 
 I decided that I wanted to come up with more columns to better interpret lyrics and had to come up with some independent variables on my own. I wrote a python script to help me. The script, which is below, imports the lyrics from the data set and finds the number of words, average word length, average rhyme length, and number of unique words in the given lyrics. 
 
-(I would suggest not running this.)
-```{python, eval=FALSE}
-import nltk
-import sys,os
-import pandas as pd
-import phonetics as ph
-import lyrics as ly
+(I've moved the code to [this github](https://github.com/kevinterwilliger/Lyric-Analysis) if you want to see the new and updated python scripts.)  
 
-# nltk.download("cmudict")
-data = pd.read_csv("billboard_lyrics_1964-2015.csv", encoding = "ISO-8859-1")
-# data = pd.read_csv("data_new.csv")
-
-def get_unique_words(lyrics):
-    words = lyrics.split(sep=" ")
-    unique_words = dict()
-    sum = 0
-    for word in words :
-        sum += len(word)
-        if word not in unique_words:
-            unique_words[word] = 1
-        else:
-            unique_words[word] += 1
-    avg = sum / len(words)
-    if len(words) is 0 :
-        length = 0
-    else:
-        length = len(words)
-    return(len(unique_words),avg,length)
-
-
-
-'''
-This finds the average rhyme length of every song in the table and binds it to
-the original data. Saves new data table to new csv.
-
-uses Eric Malme's algorithm to measure the average length of rhymes in lyrics.
-github: https://github.com/ekQ/raplysaattori
-'''
-avg_rhyme_length = []
-unique_words = []
-average_lengths = []
-num_words = []
-
-sys.stdout = open(os.devnull, 'w')
-
-for i in range(0,len(data.index)) :
-    # sometimes the lyrics are float values, idk why
-    # if the lyrics aren't a string, the avg_rhyme_length is set to a constant 9999
-    if type(data.loc[i].Lyrics) is not type(" ") or data.loc[i].Lyrics is "" :
-        avg_rhyme_length.append(9999)
-        unique_words.append(9999)
-        average_lengths.append(9999)
-        num_words.append(9999)
-    else :
-        # clean lyrics
-        lyric = data.loc[i].Lyrics.strip()
-        lyric = lyric.replace("  "," ")
-
-        w,a,n = get_unique_words(lyric)
-        unique_words.append(w)
-        average_lengths.append(a)
-        num_words.append(n)
-
-        l = ly.Lyrics(print_stats=None,text=lyric,language="en",lookback=15)
-        avg_rhyme_length.append(l.get_avg_rhyme_length())
-
-columns = pd.DataFrame({
-                'AverageRhymeLength': avg_rhyme_length,
-                'UniqueWords' : unique_words,
-                'AverageLengths' : average_lengths,
-                'NumberWords' : num_words})
-
-# columns = pd.DataFrame(unique_words,columns=['unique_words'])
-data_new = pd.concat([data,columns],axis=1,ignore_index=False)
-data_new.to_csv("data_new.csv",index=True)
-
-sys.stdout = sys.__stdout__
-print("saved")
-```
+*In case links don't work in pdf: https://github.com/kevinterwilliger/Lyric-Analysis*  
+  
 
 After saving as a csv, I imported the new data frame into R and used a package called [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to calculate a sentiment score for each of the lyrics. Here's the code:
 
@@ -140,7 +70,7 @@ Here are the Xs broken down:
 
 5. **Sentiment** - I'm not entirely sure what algorithm is used in this package, but I used the analyzeSentiment function from  [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to get each number. The sentiment is a score that gives the general "emotion" score of a word or series of words from -1 to 1. A negative score correlates to a more negative emotion, whether angry, sad, or both. Positive scores would work in the reverse, the higher the score, the more positive the sentiment expressed in the lyrics is.
  
-### Examine the Data
+### Examining the Data
 
 I'll plot the three most interesting of the X's that I mentioned above: Average Word Length, Average Rhyme Length, and Sentiment. Let's start with Average Word Length.
 
@@ -278,47 +208,61 @@ Yeah so not better. In the next report, I will be adding a few more columns, one
 
 I really want to make this project work. So far it seems likely that the linear regressions and logistic regressions in report 2 will prove to be inept at predicting Rank or Top50. As I write this conclusion, I am trying to finalize the script I mentioned above, but it relys on some APIs that are proving to be difficult. I think that trying to predict genre from variables like average rhyme length or unique words might prove more successful than predicting popularity. If the graders have any recommendations on possible Y/X variables, I'd very much appreciate the outside input. Other than that, here is report 2!
 
-## Report 2
 
-### Introductions
+## [Report2]: Report 2
 
-*Insert Finished Script* TODO: find featuring artists
+### Introduction
+
+Due to the fact that any linear regressions trying to predict the popularity of a song from the aforementioned independent variables are very underwhelming, I wrote some more python scripts (that can be found at [https://github.com/kevinterwilliger/Lyric-Analysis](https://github.com/kevinterwilliger/Lyric-Analysis)) to collect more variables such as the key or mode of a song and the genres of a song. I used the [Spotipy]() library to collect an audio analysis of the song that contains the following variables:
+
+1. **Loudness** - The overall loudness (decibels, dB) of a song.
+
+2. **Tempo** - The beats per minute of the song.
+
+3. **Key** - The estimated overall key of the song. Ranges in values from 0-11 mapping to pitches, using the standard Pitch Class Notation.
+
+4. **Mode** - Binary variable where "0" is Minor and "1" is in Major
+
+5. **Time Signiture** - The "meter" of a song is measured by the number beats in each bar. Values range from 3-7 and indicate "$\frac{3}{4}$"-"$\frac{7}{4}$".
+
+Using the Last.FM API, I was able to collect the top 5 user tags corresponding to each song. I collected 5 tags due to the fact that tags do not always contain the genre, but most songs have the specific genre in one of the 5 tags. I will explain my process for narrowing the tags down further in the report.
+
 
 
 ### Regressions
 
-Due to the fact that linear regressions for Rank are very underwhelming, I'll include regressions for Rank, Top50 (binary variable), and Genre.
+#### Rank
 
-Let's start with running some regressions on Rank.
+Let's start with running some regressions on Rank. The results are not great, but I expected this due to the fact popularity probably is not dictated by the contents of the lyrics. We'll touch on Genre after.
 
-#### Average Word Length
+##### Average Word Length
 
 ```{r}
 fit = lm(Rank ~ AverageWordLength, data=data)
 summary(fit)
 ```
 
-From the above summary, the R-squared of the linear regression of average word length on rank is 0.00005306. This is such a bad R-squared that it is clear that average word length has almost no bearing on how popular a song will be. As a fair warning, it will be like this for all Rank regressions.
+From the above summary, the R-squared of the linear regression of average word length on rank is 0.00005306. This is such a bad R-squared that it is clear that average word length has almost no bearing on how popular a song will be.
 
-#### Average Rhyme Length
+##### Average Rhyme Length
 
 ```{r}
 fit = lm(Rank ~ AverageRhymeLength,data=data)
 summary(fit)
 ```
 
-Again, a terrible R-squared. It is interesting, though, that average rhyme length has a slightly negative relationship toward rank.
+Again, a terrible R-squared. It is interesting, though, that average rhyme length has a tiny negative relationship toward rank.
 
-#### Number of Words
+##### Number of Words
 
 ```{r}
 fit = lm(Rank ~ NumberWords, data=data)
 summary(fit)
 ```
 
-I did warn the reader.
+I would expect a small or negative relationship from this due to the fact that long songs do not often recieve as many listens as shorter songs.
 
-#### Number of Unique Words
+##### Number of Unique Words
 
 ```{r}
 fit = lm(Rank ~ UniqueWords, data = data)
@@ -327,14 +271,238 @@ summary(fit)
 
 This is the most significant variable, it being able to pass a 85% significance test. It is a shame, though, that the R-squared is basically zero.
 
-### Logistic Regressions
 
-Using the Top50 variable generated above, let's see if logistic regressions offer us some better models.
 
-#### Average Word Length
+#### Genre
+
+Next, let's use genre as the variable we are trying to predict.
+
+First we have to clean the genre data and create a singular genre column.
+
+```{r definition,echo=F}
+rap <- function(genre) {
+  l = c("rap","hiphop","hip hop","hip-hop")
+  return(genre %in% l)
+}
+```
+
 
 ```{r}
-fit = glm(Top50 ~ AverageWordLength, data=binary)
+tags = read.csv("genres.csv",header=T)
+
+# This has got to be the least efficient way to do this so if you have any suggestions, I am very open.
+list = c("rock","folk","country","/^hip*[a-z]./","soul","r&b","classic rock","smooth jazz",
+         "jazz","garage rock","punk","metal","folk rock","british","surf","fip","rap","hip hop",
+         "rnb","indie","indie rock","pop rock","soft rock","psychadelic","psychadelic rock","electronic",
+         "synth pop","dance","funk","reggae","progressive rock","punk rock","hip-hop","love","hiphop","house","pop")
+
+
+# Find tags that match to those in list and put in genre column
+genres = tags %>% 
+  mutate(genre = ifelse(str_trim(tolower(Tag1)) %in% list, str_trim(tolower(Tag1)),
+                        ifelse(str_trim(tolower(Tag2)) %in% list, str_trim(tolower(Tag2)),
+                               ifelse(str_trim(tolower(Tag3)) %in% list, str_trim(tolower(Tag3)),
+                                      ifelse(str_trim(tolower(Tag4)) %in% list, str_trim(tolower(Tag4)),
+                                             ifelse(str_trim(tolower(Tag5)) %in% list, str_trim(tolower(Tag5)),9999)))))) %>% 
+  select(genre)
+
+temp = genres[genres$Tag1 != 9999,]
+temp2 = temp[temp$genre == 9999,]
+# View(temp2)
+data_genres = cbind(data,genres) %>% select(-c(X.1,Unnamed..0,X))
+
+clean_full = data_genres[data_genres$genre != 9999,] %>% mutate(genre = ifelse(rap(genre),"rap",genre))
+
+```
+
+Due to the nature of the API, I ended up dropping around 187 songs, but that leaves us with 3931 rows of song data, genre included. Lets look at the spread of the genres.
+
+```{r}
+num_genre = clean_full %>% group_by(genre) %>% summarise(count=n()) %>% select(genre,count)
+
+genre_plot = num_genre[num_genre$count > 20,] %>%
+  ggplot(., aes(x=genre, y=count, fill=genre)) +
+  geom_bar(stat="identity")+theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = 'none')
+
+genre_plot
+```
+
+There are about 1200 pop songs, but pop is such a wide ranging genre that this should be somewhat expected. Other than pop, it seems that these 17 genres are pretty all-representing.
+
+This cleans the genres with under 20 songs and creates binary columns representing the 17 genres.
+
+```{r}
+
+genre_list = num_genre[num_genre$count > 20,] %>% mutate(X = row_number())
+
+clean_cut = clean_full[clean_full$genre %in% genre_list$genre_,] %>% mutate(X = row_number()) %>% rename(genre_ = genre)
+
+binary = as.data.frame(clean_cut %>% select(X,genre_) %>% model.matrix(~ . + 0,data=.))
+
+final_data = right_join(clean_cut,binary,by="X",keep=F)
+colnames(final_data)
+```
+
+
+Now that we have our genre columns, we can try to predict the genre from the different independent variables.
+
+##### Predicting Pop songs
+
+First lets try just the lyric data.
+
+```{r}
+pop = final_data %>% select(genre_pop,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+
+fit = glm(genre_pop ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=pop,family = "binomial")
 summary(fit)
 ```
 
+From this it seems like Number of Words, Unique Words, and Rank are all significant. Let's drop the insignificant variables.
+
+```{r}
+pop = pop %>% select(Rank,genre_pop,NumberWords,UniqueWords)
+
+fit = glm(genre_pop ~ Rank + NumberWords + UniqueWords,data=pop,family=binomial)
+summary(fit)
+```
+
+And let's then create a confusion matrix.
+
+```{r}
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Pop",nrow(pop))
+prediction[probs > .5]="Pop"
+real = recode(pop$genre_pop,"1"="Pop","0"="Not Pop")
+table(prediction,real)
+```
+
+The confusion matrix tells us that the model predicts that a song is not pop very accuratly, but seems unable to predict when a song is pop. Let's see if this is the case for other genres too.
+
+##### Predicting Rock Songs
+
+Using the same logic from above, here is the fit summary for predicting whether a song is rock or not.
+
+```{r}
+rock = final_data %>% select(genre_rock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+
+fit = glm(genre_rock ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=rock,family = "binomial")
+summary(fit)
+```
+
+Interestingly, there are different significant variables. Rank and Number of Words are the same, but this time sentiment is significant. What is interesting is that the coefficient for sentiment is much larger than any other variable from rock or pop.
+
+```{r}
+rock = rock %>% select(Rank,genre_rock,NumberWords,Sentiment)
+
+fit = glm(genre_rock ~ Rank + NumberWords + Sentiment,data=rock,family=binomial)
+summary(fit)
+```
+
+And let's then create a confusion matrix.
+
+```{r}
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Rock",nrow(rock))
+prediction[probs > .5]="Rock"
+real = recode(rock$genre_rock,"1"="Rock","0"="Not Rock")
+table(prediction,real)
+unique(prediction)
+```
+
+The last function I call is to prove that the model only predicts "Not Rock" (0) for any input in the data set. Due to that, the model can't be a good predictor if it can't predict that a rock song is a rock song. I'm going to remove pop songs from the data set to see if it helps.
+
+```{r}
+notPop = final_data[final_data$genre_pop == 0,]
+
+rock = notPop %>% select(genre_rock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+
+fit = glm(genre_rock ~ Rank + NumberWords + Sentiment, data=rock,family = binomial)
+summary(fit)
+
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Rock",nrow(rock))
+prediction[probs > .5]="Rock"
+real = recode(rock$genre_rock,"1"="Rock","0"="Not Rock")
+table(prediction,real)
+unique(prediction)
+```
+
+This time, the model predicted "Rock" (1) one time, which was a false positive. I'll consider this model bust.
+
+##### Predicting Audio Analysis
+
+Now I am going to incorporate results from my Spotify API into these logisitc regressions. Hip-Hop is my favorite type of music, and tends to have pretty unique musical traits, so I'll use rap as a prediction variable out of non-pop songs.
+
+```{r}
+notPoporRock = notPop[notPop$genre_rock==0,]
+aa = final_data %>% select(Rank,genre_pop,Loudness,Mode,Key,time_signature,Tempo,Sentiment,NumberWords,UniqueWords,AverageWordLength,AverageRhymeLength)
+
+fit = glm(genre_pop ~ UniqueWords + Loudness:Tempo,data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],family = binomial)
+summary(fit)
+
+```
+
+Both variables are signficantly different from 0 but their coefficients are so small that any change in the variable has negligible effect. It is interesting that unique words has a negetive coefficient, though. Maybe because Pop songs often repeat the same phrase or word often. 
+
+And the confusion table.
+
+
+```{r}
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
+prediction[probs > .5]="Pop"
+real = recode(aa$genre_pop,"1"="Pop","0"="Not Pop")
+table(prediction,real)
+```
+
+```{r}
+# Percent Correct
+mean(prediction==real)
+
+# False Positive Rate
+20/23
+
+# True Positive Rate
+2540/2560
+```
+
+
+For the sake of shortness, I ran a bunch of different combinations and this is the best I could predict. The model rarely predicts that a song is "Pop", but has a high false positive rate. Because the model mostly outputs "Not Pop" it has a high true positive rate - 66% of the data was "Not Pop".
+
+
+##### Standard Errors
+
+As I mentioned above, the coefficients are very small, though significantly different from zero.
+
+```{r}
+dwplot(fit,vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2))
+```
+
+##### Probit Regression
+
+Here is a probit regression for comparison.
+
+```{r}
+fit = glm(genre_pop ~ UniqueWords + Loudness:Tempo,data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],family = binomial(link="probit"))
+#summary(fit)
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
+prediction[probs > .5]="Pop"
+real = recode(aa$genre_pop,"1"="Pop","0"="Not Pop")
+table(prediction,real)
+```
+
+It seems that the coefficients in the probit regression are different from the logit, but still so small that they are mostly negligible.
+
+### Conclusions
+
+I had hoped that the results with the new independent columns would be better predictors of genre, but it seems that my data is not well enough suited to predict anything from the data. 
+
+I'm not really sure where I'll go from here, but I think I can find ways to better predict genre or rank.
