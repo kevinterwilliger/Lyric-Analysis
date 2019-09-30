@@ -1,24 +1,28 @@
 ---
 title: "Terwilliger_Kevin_report2.pdf"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
-#setwd("~/Desktop/GitHub/Econ490/Report2")
-setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report2")
+setwd("~/Desktop/GitHub/Econ490/Report2")
+# setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report2")
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(stringr)
 library(SentimentAnalysis)
 library(ggplot2)
 library(dotwhisker)
+library(stats)
 #library(reticulate)
 data = read.csv("Data_new_new.csv",header=T)
 ```
 
 # Predicting Song Popularity from Characteristics of Lyrics
 
-[(Click here to skip to Report 2.)][Report2]  
+[Click here to skip to Report 2.](#Report2)  
 
 ## Report 1
 
@@ -141,7 +145,7 @@ data$Year[data$Song == "100 pure love"]
 
 I'm going to say that the creator did nothing wrong and that the vast majority, if not all, duplicates are caused by songs being popular for more than just one year. I think I will remove duplicates in the future.
 
-```{r}
+```{r echo=F,include=F}
 new = data %>%
   mutate(track = paste(Song,Artist,sep=" "))
 temp = anti_join(new,proof,by="track")
@@ -209,7 +213,10 @@ Yeah so not better. In the next report, I will be adding a few more columns, one
 I really want to make this project work. So far it seems likely that the linear regressions and logistic regressions in report 2 will prove to be inept at predicting Rank or Top50. As I write this conclusion, I am trying to finalize the script I mentioned above, but it relys on some APIs that are proving to be difficult. I think that trying to predict genre from variables like average rhyme length or unique words might prove more successful than predicting popularity. If the graders have any recommendations on possible Y/X variables, I'd very much appreciate the outside input. Other than that, here is report 2!
 
 
-## [Report2]: Report 2
+## Report 2 {#Report2}
+```{r include=F}
+data = read.csv("data_new_new.csv",header = T)
+```
 
 ### Introduction
 
@@ -279,7 +286,7 @@ Next, let's use genre as the variable we are trying to predict.
 
 First we have to clean the genre data and create a singular genre column.
 
-```{r definition,echo=F}
+```{r definition,include=F}
 rap <- function(genre) {
   l = c("rap","hiphop","hip hop","hip-hop")
   return(genre %in% l)
@@ -293,8 +300,9 @@ tags = read.csv("genres.csv",header=T)
 # This has got to be the least efficient way to do this so if you have any suggestions, I am very open.
 list = c("rock","folk","country","/^hip*[a-z]./","soul","r&b","classic rock","smooth jazz",
          "jazz","garage rock","punk","metal","folk rock","british","surf","fip","rap","hip hop",
-         "rnb","indie","indie rock","pop rock","soft rock","psychadelic","psychadelic rock","electronic",
-         "synth pop","dance","funk","reggae","progressive rock","punk rock","hip-hop","love","hiphop","house","pop")
+         "rnb","indie","indie rock","pop rock","soft rock","psychadelic",
+         "psychadelic","rock","electronic","synth pop","dance","funk",
+         "reggae","progressive rock","punk rock","hip-hop","love","hiphop","house","pop")
 
 
 # Find tags that match to those in list and put in genre column
@@ -306,12 +314,10 @@ genres = tags %>%
                                              ifelse(str_trim(tolower(Tag5)) %in% list, str_trim(tolower(Tag5)),9999)))))) %>% 
   select(genre)
 
-temp = genres[genres$Tag1 != 9999,]
-temp2 = temp[temp$genre == 9999,]
-# View(temp2)
-data_genres = cbind(data,genres) %>% select(-c(X.1,Unnamed..0,X))
+data_genres = cbind(data,genres)
 
-clean_full = data_genres[data_genres$genre != 9999,] %>% mutate(genre = ifelse(rap(genre),"rap",genre))
+clean_full = data_genres[data_genres$genre != 9999,] %>% 
+  mutate(genre = ifelse(rap(genre),"rap",genre))
 
 ```
 
@@ -320,13 +326,13 @@ Due to the nature of the API, I ended up dropping around 187 songs, but that lea
 ```{r}
 num_genre = clean_full %>% group_by(genre) %>% summarise(count=n()) %>% select(genre,count)
 
-genre_plot = num_genre[num_genre$count > 20,] %>%
+genreplot = num_genre[num_genre$count > 20,] %>%
   ggplot(., aes(x=genre, y=count, fill=genre)) +
   geom_bar(stat="identity")+theme_minimal()+ 
   theme(axis.text.x = element_text(angle = 90, hjust = 1),
         legend.position = 'none')
 
-genre_plot
+genreplot
 ```
 
 There are about 1200 pop songs, but pop is such a wide ranging genre that this should be somewhat expected. Other than pop, it seems that these 17 genres are pretty all-representing.
@@ -337,12 +343,15 @@ This cleans the genres with under 20 songs and creates binary columns representi
 
 genre_list = num_genre[num_genre$count > 20,] %>% mutate(X = row_number())
 
-clean_cut = clean_full[clean_full$genre %in% genre_list$genre_,] %>% mutate(X = row_number()) %>% rename(genre_ = genre)
+clean_cut = clean_full[clean_full$genre %in% genre_list$genre,] %>% 
+  mutate(X = row_number())
 
-binary = as.data.frame(clean_cut %>% select(X,genre_) %>% model.matrix(~ . + 0,data=.))
+
+binary = as.data.frame(clean_cut %>% select(X,genre) %>% model.matrix(~.,data=.))
 
 final_data = right_join(clean_cut,binary,by="X",keep=F)
 colnames(final_data)
+head(final_data$Loudness)
 ```
 
 
@@ -353,18 +362,18 @@ Now that we have our genre columns, we can try to predict the genre from the dif
 First lets try just the lyric data.
 
 ```{r}
-pop = final_data %>% select(genre_pop,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+pop = final_data %>% select(genrepop,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
 
-fit = glm(genre_pop ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=pop,family = "binomial")
+fit = glm(genrepop ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=pop,family = "binomial")
 summary(fit)
 ```
 
 From this it seems like Number of Words, Unique Words, and Rank are all significant. Let's drop the insignificant variables.
 
 ```{r}
-pop = pop %>% select(Rank,genre_pop,NumberWords,UniqueWords)
+pop = pop %>% select(Rank,genrepop,NumberWords,UniqueWords)
 
-fit = glm(genre_pop ~ Rank + NumberWords + UniqueWords,data=pop,family=binomial)
+fit = glm(genrepop ~ Rank + NumberWords + UniqueWords,data=pop,family=binomial)
 summary(fit)
 ```
 
@@ -375,7 +384,7 @@ probs = predict(fit,type="response")
 prediction = predict(fit)
 prediction = rep("Not Pop",nrow(pop))
 prediction[probs > .5]="Pop"
-real = recode(pop$genre_pop,"1"="Pop","0"="Not Pop")
+real = recode(pop$genrepop,"1"="Pop","0"="Not Pop")
 table(prediction,real)
 ```
 
@@ -386,18 +395,18 @@ The confusion matrix tells us that the model predicts that a song is not pop ver
 Using the same logic from above, here is the fit summary for predicting whether a song is rock or not.
 
 ```{r}
-rock = final_data %>% select(genre_rock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+rock = final_data %>% select(genrerock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
 
-fit = glm(genre_rock ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=rock,family = "binomial")
+fit = glm(genrerock ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=rock,family = "binomial")
 summary(fit)
 ```
 
 Interestingly, there are different significant variables. Rank and Number of Words are the same, but this time sentiment is significant. What is interesting is that the coefficient for sentiment is much larger than any other variable from rock or pop.
 
 ```{r}
-rock = rock %>% select(Rank,genre_rock,NumberWords,Sentiment)
+rock = rock %>% select(Rank,genrerock,NumberWords,Sentiment)
 
-fit = glm(genre_rock ~ Rank + NumberWords + Sentiment,data=rock,family=binomial)
+fit = glm(genrerock ~ Rank + NumberWords + Sentiment,data=rock,family=binomial)
 summary(fit)
 ```
 
@@ -408,7 +417,7 @@ probs = predict(fit,type="response")
 prediction = predict(fit)
 prediction = rep("Not Rock",nrow(rock))
 prediction[probs > .5]="Rock"
-real = recode(rock$genre_rock,"1"="Rock","0"="Not Rock")
+real = recode(rock$genrerock,"1"="Rock","0"="Not Rock")
 table(prediction,real)
 unique(prediction)
 ```
@@ -416,18 +425,18 @@ unique(prediction)
 The last function I call is to prove that the model only predicts "Not Rock" (0) for any input in the data set. Due to that, the model can't be a good predictor if it can't predict that a rock song is a rock song. I'm going to remove pop songs from the data set to see if it helps.
 
 ```{r}
-notPop = final_data[final_data$genre_pop == 0,]
+notPop = final_data[final_data$genrepop == 0,]
 
-rock = notPop %>% select(genre_rock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+rock = notPop %>% select(genrerock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
 
-fit = glm(genre_rock ~ Rank + NumberWords + Sentiment, data=rock,family = binomial)
+fit = glm(genrerock ~ Rank + NumberWords + Sentiment, data=rock,family = binomial)
 summary(fit)
 
 probs = predict(fit,type="response")
 prediction = predict(fit)
 prediction = rep("Not Rock",nrow(rock))
 prediction[probs > .5]="Rock"
-real = recode(rock$genre_rock,"1"="Rock","0"="Not Rock")
+real = recode(rock$genrerock,"1"="Rock","0"="Not Rock")
 table(prediction,real)
 unique(prediction)
 ```
@@ -439,12 +448,10 @@ This time, the model predicted "Rock" (1) one time, which was a false positive. 
 Now I am going to incorporate results from my Spotify API into these logisitc regressions. Hip-Hop is my favorite type of music, and tends to have pretty unique musical traits, so I'll use rap as a prediction variable out of non-pop songs.
 
 ```{r}
-notPoporRock = notPop[notPop$genre_rock==0,]
-aa = final_data %>% select(Rank,genre_pop,Loudness,Mode,Key,time_signature,Tempo,Sentiment,NumberWords,UniqueWords,AverageWordLength,AverageRhymeLength)
+aa = final_data[(final_data$Loudness != 9999) && (final_data$Tempo != 9999),]
 
-fit = glm(genre_pop ~ UniqueWords + Loudness:Tempo,data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],family = binomial)
+fit = glm(genrepop ~ UniqueWords + Loudness:Tempo,data=aa,family = binomial)
 summary(fit)
-
 ```
 
 Both variables are signficantly different from 0 but their coefficients are so small that any change in the variable has negligible effect. It is interesting that unique words has a negetive coefficient, though. Maybe because Pop songs often repeat the same phrase or word often. 
@@ -457,7 +464,7 @@ probs = predict(fit,type="response")
 prediction = predict(fit)
 prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
 prediction[probs > .5]="Pop"
-real = recode(aa$genre_pop,"1"="Pop","0"="Not Pop")
+real = recode(aa$genrepop,"1"="Pop","0"="Not Pop")
 table(prediction,real)
 ```
 
@@ -489,13 +496,13 @@ dwplot(fit,vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2))
 Here is a probit regression for comparison.
 
 ```{r}
-fit = glm(genre_pop ~ UniqueWords + Loudness:Tempo,data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],family = binomial(link="probit"))
+fit = glm(genrepop ~ UniqueWords + Loudness:Tempo,data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],family = binomial(link="probit"))
 #summary(fit)
 probs = predict(fit,type="response")
 prediction = predict(fit)
 prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
 prediction[probs > .5]="Pop"
-real = recode(aa$genre_pop,"1"="Pop","0"="Not Pop")
+real = recode(aa$genrepop,"1"="Pop","0"="Not Pop")
 table(prediction,real)
 ```
 
