@@ -1,5 +1,5 @@
 ---
-title: "Terwilliger_Kevin_report2.pdf"
+title: "Predicting Song Popularity from Characteristics of Lyrics"
 output:
   pdf_document: default
   html_document:
@@ -20,16 +20,62 @@ library(stats)
 data = read.csv("Data_new_new.csv",header=T)
 ```
 
-# Predicting Song Popularity from Characteristics of Lyrics
+# Table of Contents (Clickable!)
 
-[Click here to skip to Report 2.](#Report2)  
+1. **[Report 1.](#Report1)**
 
-## Report 1
+  + *[Introduction](#intro1)*
+  
+  + *[Cleaning the Data](#clean)*
+  
+  + *[Examining the Data](#examine)*
+  
+  + *[Correlation of Variables](#corr)*
+  
+  + *[Conclusion](#conc)*
 
-### Introduction
+2. **[Report 2.](#Report2)**
+
+  + *[Introduction](#intro2)*
+  
+  + *[Regressions](#reg)*
+    
+    - [Rank](#rank)
+    
+      * [Average Word Length](#awl)
+    
+      * [Average Rhyme Length](#arl)
+    
+      * [Number of Words](#nw)
+    
+      * [Unique Words](#uw)
+      
+      * [Sentiment](#sent)
+      
+    - [Genre](#genre)
+    
+      * [Cleaning Genre Data](#clean2)
+      
+      * [Predicting Pop Songs](#pop)
+      
+      * [Predicting Rock Songs](#rock)
+      
+      * [Predicting Audio Analysis](#aa)
+      
+      * [Standard Errors](#se)
+      
+      * [Probit Regression](#pr)
+      
+  + *[Conclusion](#conc2)*
+    
+\newpage
+
+## Report 1 {#Report1}
+
+### Introduction {#intro1}
 I listen to a lot of music. I've never really had a musical bone in my body so I tend to gravitate toward the lyrics of a song (which is a reason why you'll never find an EDM song in my playlists). After finding a dataset on Kaggle containing the lyrics of Billboard's Hot100 year-end chart from 1964-2015, I decided that it would be interesting to use the lyrics to try to predict a given song's success on the BillBoard Hot100. The Hot100 is just a list of the most popular songs of the given year ranked from 1 (most popular) to 100 (100-most popular).
 
-### Cleaning the data
+### Cleaning the Data {#clean}
 
 Here's what my original data set looked like.
 ```{r}
@@ -74,7 +120,7 @@ Here are the Xs broken down:
 
 5. **Sentiment** - I'm not entirely sure what algorithm is used in this package, but I used the analyzeSentiment function from  [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to get each number. The sentiment is a score that gives the general "emotion" score of a word or series of words from -1 to 1. A negative score correlates to a more negative emotion, whether angry, sad, or both. Positive scores would work in the reverse, the higher the score, the more positive the sentiment expressed in the lyrics is.
  
-### Examining the Data
+### Examining the Data {#examine}
 
 I'll plot the three most interesting of the X's that I mentioned above: Average Word Length, Average Rhyme Length, and Sentiment. Let's start with Average Word Length.
 
@@ -153,7 +199,7 @@ temp = anti_join(new,proof,by="track")
 ```
 
 
-### Correlation of Variables
+### Correlation of Variables {#corr}
 
 ```{r,warning=F}
 d = data %>% select(.,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
@@ -208,7 +254,7 @@ boxplot(Sentiment ~ Top50,data=binary)
 
 Yeah so not better. In the next report, I will be adding a few more columns, one of them being genre of the song. I will probably try to predict genre from the other columns, hopefully it will work better.
 
-### Concluding Thoughts
+### Concluding Thoughts {#conc}
 
 I really want to make this project work. So far it seems likely that the linear regressions and logistic regressions in report 2 will prove to be inept at predicting Rank or Top50. As I write this conclusion, I am trying to finalize the script I mentioned above, but it relys on some APIs that are proving to be difficult. I think that trying to predict genre from variables like average rhyme length or unique words might prove more successful than predicting popularity. If the graders have any recommendations on possible Y/X variables, I'd very much appreciate the outside input. Other than that, here is report 2!
 
@@ -218,9 +264,9 @@ I really want to make this project work. So far it seems likely that the linear 
 data = read.csv("data_new_new.csv",header = T)
 ```
 
-### Introduction
+### Introduction {#intro2}
 
-Due to the fact that any linear regressions trying to predict the popularity of a song from the aforementioned independent variables are very underwhelming, I wrote some more python scripts (that can be found at [https://github.com/kevinterwilliger/Lyric-Analysis](https://github.com/kevinterwilliger/Lyric-Analysis)) to collect more variables such as the key or mode of a song and the genres of a song. I used the [Spotipy]() library to collect an audio analysis of the song that contains the following variables:
+Due to the fact that any linear regressions trying to predict the popularity of a song from the aforementioned independent variables are very underwhelming, I wrote some more python scripts (that can be found at [https://github.com/kevinterwilliger/Lyric-Analysis](https://github.com/kevinterwilliger/Lyric-Analysis)) to collect more variables such as the key or mode of a song and the genres of a song. I used the [Spotipy](https://spotipy.readthedocs.io/en/latest/) library to collect an audio analysis of the song that contains the following variables:
 
 1. **Loudness** - The overall loudness (decibels, dB) of a song.
 
@@ -236,13 +282,13 @@ Using the Last.FM API, I was able to collect the top 5 user tags corresponding t
 
 
 
-### Regressions
+### Regressions {#reg}
 
-#### Rank
+#### Rank {#rank}
 
 Let's start with running some regressions on Rank. The results are not great, but I expected this due to the fact popularity probably is not dictated by the contents of the lyrics. We'll touch on Genre after.
 
-##### Average Word Length
+##### Average Word Length {#awl}
 
 ```{r}
 fit = lm(Rank ~ AverageWordLength, data=data)
@@ -251,7 +297,7 @@ summary(fit)
 
 From the above summary, the R-squared of the linear regression of average word length on rank is 0.00005306. This is such a bad R-squared that it is clear that average word length has almost no bearing on how popular a song will be.
 
-##### Average Rhyme Length
+##### Average Rhyme Length {#arl}
 
 ```{r}
 fit = lm(Rank ~ AverageRhymeLength,data=data)
@@ -260,7 +306,7 @@ summary(fit)
 
 Again, a terrible R-squared. It is interesting, though, that average rhyme length has a tiny negative relationship toward rank.
 
-##### Number of Words
+##### Number of Words {#nw}
 
 ```{r}
 fit = lm(Rank ~ NumberWords, data=data)
@@ -269,7 +315,7 @@ summary(fit)
 
 I would expect a small or negative relationship from this due to the fact that long songs do not often recieve as many listens as shorter songs.
 
-##### Number of Unique Words
+##### Number of Unique Words {#uw}
 
 ```{r}
 fit = lm(Rank ~ UniqueWords, data = data)
@@ -278,9 +324,18 @@ summary(fit)
 
 This is the most significant variable, it being able to pass a 85% significance test. It is a shame, though, that the R-squared is basically zero.
 
+##### Sentiment {#sent}
 
+```{r}
+fit = lm(Rank~Sentiment,data=data)
+summary(fit)
+```
 
-#### Genre
+So none of my lyrics columns are good predictors of Rank.
+
+#### Genre {#genre}
+
+##### Cleaning Genre Data {#clean2}
 
 Next, let's use genre as the variable we are trying to predict.
 
@@ -357,7 +412,7 @@ head(final_data$Loudness)
 
 Now that we have our genre columns, we can try to predict the genre from the different independent variables.
 
-##### Predicting Pop songs
+##### Predicting Pop songs {#pop}
 
 First lets try just the lyric data.
 
@@ -390,7 +445,7 @@ table(prediction,real)
 
 The confusion matrix tells us that the model predicts that a song is not pop very accuratly, but seems unable to predict when a song is pop. Let's see if this is the case for other genres too.
 
-##### Predicting Rock Songs
+##### Predicting Rock Songs {#rock}
 
 Using the same logic from above, here is the fit summary for predicting whether a song is rock or not.
 
@@ -443,7 +498,7 @@ unique(prediction)
 
 This time, the model predicted "Rock" (1) one time, which was a false positive. I'll consider this model bust.
 
-##### Predicting Audio Analysis
+##### Predicting Audio Analysis {#aa}
 
 Now I am going to incorporate results from my Spotify API into these logisitc regressions. Hip-Hop is my favorite type of music, and tends to have pretty unique musical traits, so I'll use rap as a prediction variable out of non-pop songs.
 
@@ -483,7 +538,7 @@ mean(prediction==real)
 For the sake of shortness, I ran a bunch of different combinations and this is the best I could predict. The model rarely predicts that a song is "Pop", but has a high false positive rate. Because the model mostly outputs "Not Pop" it has a high true positive rate - 66% of the data was "Not Pop".
 
 
-##### Standard Errors
+##### Standard Errors {#se}
 
 As I mentioned above, the coefficients are very small, though significantly different from zero.
 
@@ -491,7 +546,7 @@ As I mentioned above, the coefficients are very small, though significantly diff
 dwplot(fit,vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2))
 ```
 
-##### Probit Regression
+##### Probit Regression {#pr}
 
 Here is a probit regression for comparison.
 
@@ -508,7 +563,7 @@ table(prediction,real)
 
 It seems that the coefficients in the probit regression are different from the logit, but still so small that they are mostly negligible.
 
-### Conclusions
+### Conclusions {#conc2}
 
 I had hoped that the results with the new independent columns would be better predictors of genre, but it seems that my data is not well enough suited to predict anything from the data. 
 
