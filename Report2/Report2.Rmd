@@ -17,7 +17,8 @@ library(ggplot2)
 library(dotwhisker)
 library(stats)
 #library(reticulate)
-data = read.csv("Data_new_new.csv",header=T)
+new_data = read.csv("Data_and_feature.csv",header=T)
+data = read.csv("data_and_feature.csv",header = T)
 ```
 
 # Table of Contents (Clickable!)
@@ -94,12 +95,12 @@ I decided that I wanted to come up with more columns to better interpret lyrics 
 After saving as a csv, I imported the new data frame into R and used a package called [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to calculate a sentiment score for each of the lyrics. Here's the code:
 
 ```{r, eval=FALSE}
-data = read.csv("data_new.csv")
-data = data %>% 
+data1 = read.csv("data_new.csv")
+data1 = data1 %>% 
   mutate("Sentiment" = analyzeSentiment(as.character(Lyrics))$SentimentQDAP) %>%
   rename("AverageWordLength" = AverageLengths)
 
-write.csv(data,"data_clean.csv")
+# write.csv(data,"data_clean.csv")
 ```
 
 Here are the Xs broken down:
@@ -124,9 +125,9 @@ Here are the Xs broken down:
 
 I'll plot the three most interesting of the X's that I mentioned above: Average Word Length, Average Rhyme Length, and Sentiment. Let's start with Average Word Length.
 
-```{r}
-data = read.csv("../Report1/data_clean.csv")
-plot = ggplot(data,aes(x=AverageWordLength)) +
+```{r, eval=F}
+data2 = read.csv("../Report1/data_clean.csv")
+plot = ggplot(data2,aes(x=AverageWordLength)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
   geom_density(alpha=.2, fill="#FF6666") +
   labs(title = "Histogram of Average Word Length per Song",x="Average Word Length",y="Density") +
@@ -136,8 +137,8 @@ plot
 
 From the plot, we can see that the average word length in each song tends to be between 3 letters and 5 letters. I wonder how this histogram differs from the average word length of all english words. My best guess is that this graph is shifted left: not that many songs use words like supercalifragilisticexpialidocious. Next, Average Rhyme Length.
 
-```{r}
-plot = ggplot(data,aes(x=AverageRhymeLength)) +
+```{r eval=F}
+plot = ggplot(data2,aes(x=AverageRhymeLength)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
   geom_density(alpha=.2, fill="#FF6666") +
   labs(title = "Histogram of Average Rhyme Length per Song",x="Average Rhyme Length",y="Density") +
@@ -149,8 +150,8 @@ So the average rhyme length in the songs is around 1 vowel-phonetic per rhyme. I
 
 And Sentiment.
 
-```{r}
-plot = ggplot(data,aes(x=Sentiment)) +
+```{r eval=F}
+plot = ggplot(data2,aes(x=Sentiment)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
   geom_density(alpha=.2, fill="#FF6666") +
   labs(title = "Histogram of Sentiment of Song",x="Sentiment",y="Density") +
@@ -160,8 +161,8 @@ plot
 
 So most songs tend to skew positive, I guess that's not terribly surprising. And finally, Rank on Billboard Hot100. This is technically a discrete variable, but it has 100 values so a histogram works better. 
 
-```{r}
-plot = ggplot(data,aes(x=Rank)) +
+```{r eval=F}
+plot = ggplot(data2,aes(x=Rank)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=100) +
   geom_density(alpha=.2, fill="#FF6666") +
   labs(title = "Histogram of Rank of Songs on Billboard Hot100",x="Rank",y="Density") +
@@ -174,28 +175,30 @@ The question above actually has two answers. The first is because this "data" is
 
 ```{r}
 # get the count of every song/artist combination
-proof = data %>%
+proof = data2 %>%
   mutate(track = paste(Song,Artist,sep=" ")) %>%
   group_by(track) %>%
-  summarise(n = n())
+  summarise(n = n()) %>%
+  filter(n > 1)
 # Checking for duplicates
-proof[proof$n > 1,]
-
+proof
 ```
 
 So there are 195 duplicates. Out of curiosity, are these duplicates an error by whoever created the dataset?
 
 ```{r}
-data$Year[data$Song == "100 pure love"]
+data2$Year[data2$Song == "100 pure love"]
 ```
 
 I'm going to say that the creator did nothing wrong and that the vast majority, if not all, duplicates are caused by songs being popular for more than just one year. I think I will remove duplicates in the future.
 
-```{r echo=F,include=F}
-new = data %>%
+```{r echo=F,include=T}
+data_ = read.csv("data_and_feature.csv",header=T)
+new = data_ %>%
   mutate(track = paste(Song,Artist,sep=" "))
-temp = anti_join(new,proof,by="track")
-####AHHHHHHHHHHHHHHHH WHY NO WORK TODO: Fix this shit
+
+data2 = new[!new$track %in% proof$track,] %>% select(-c(X.2,X.1,X,Unnamed..0))
+# write.csv(data2,"data_and_feature_Clean.csv")
 ```
 
 
@@ -261,7 +264,7 @@ I really want to make this project work. So far it seems likely that the linear 
 
 ## Report 2 {#Report2}
 ```{r include=F}
-data = read.csv("data_new_new.csv",header = T)
+data = read.csv("data_and_feature_Clean.csv",header = T)
 ```
 
 ### Introduction {#intro2}
@@ -369,10 +372,14 @@ genres = tags %>%
                                              ifelse(str_trim(tolower(Tag5)) %in% list, str_trim(tolower(Tag5)),9999)))))) %>% 
   select(genre)
 
-data_genres = cbind(data,genres)
 
+old = read.csv("data_and_feature.csv",header=T)
+data_genres = cbind(old,genres) %>% mutate(track = paste(Song,Artist,sep=" "))
+  
 clean_full = data_genres[data_genres$genre != 9999,] %>% 
-  mutate(genre = ifelse(rap(genre),"rap",genre))
+  mutate(genre = ifelse(rap(genre),"rap",genre),
+         track = paste(Song,Artist,sep = " ")) %>%
+  filter(track %in% data$track)
 
 ```
 
