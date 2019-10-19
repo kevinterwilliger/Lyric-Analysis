@@ -18,10 +18,10 @@ library(dotwhisker)
 library(stats)
 library(xtable)
 #library(reticulate)
-new_data = read.csv("Data_and_feature.csv",header=T)
+# new_data = read.csv("Data_and_feature.csv",header=T)
 ```
 
-# Table of Contents (Clickable!)
+## Table of Contents (Clickable!)
 
 1. **[Report 1.](#Report1)**
 
@@ -68,7 +68,11 @@ new_data = read.csv("Data_and_feature.csv",header=T)
       * [Probit Regression](#pr)
       
   + *[Conclusion](#conc2)*
-    
+  
+3. **[Report 3.](#Report3)**
+
+  + *[Introduction](#intro3)*
+  
 \newpage
 
 ## Report 1 {#Report1}
@@ -83,25 +87,24 @@ Here's what my original data set looked like.
 original_data = read.csv("../Report1/billboard_lyrics_1964-2015.csv")
 names(original_data)
 # head(original_data)
-print(xtable(original_data[1:5,]),type = "latex",comment = F)
+original_data[1:5,] %>% select(Rank,Song,Artist,Year) # Excluding Lyrics
 ```
 
 I decided that I wanted to come up with more columns to better interpret lyrics and had to come up with some independent variables on my own. I wrote a python script to help me. The script, which is below, imports the lyrics from the data set and finds the number of words, average word length, average rhyme length, and number of unique words in the given lyrics. 
 
 (I've moved the code to [this github](https://github.com/kevinterwilliger/Lyric-Analysis) if you want to see the new and updated python scripts.)  
 
-*In case links don't work in pdf: https://github.com/kevinterwilliger/Lyric-Analysis*  
+*https://github.com/kevinterwilliger/Lyric-Analysis*  
   
 
 After saving as a csv, I imported the new data frame into R and used a package called [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to calculate a sentiment score for each of the lyrics. Here's the code:
 
-```{r}
+```{r include=F, eval=F}
 data1 = read.csv("data_new.csv")
-data1 = data1 %>% 
+data1 = data1 %>%
   mutate("Sentiment" = analyzeSentiment(as.character(Lyrics))$SentimentQDAP) %>%
   rename("AverageWordLength" = AverageLengths)
-
-# write.csv(data,"data_clean.csv")
+write.csv(data,"data_clean.csv")
 ```
 
 Here are the Xs broken down:
@@ -132,7 +135,8 @@ head(data2)
 plot = ggplot(data2,aes(x=AverageWordLength)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
   geom_density(alpha=.2, fill="#FF6666") +
-  labs(title = "Histogram of Average Word Length per Song",x="Average Word Length",y="Density") +
+  labs(title = "Histogram of Average Word Length per Song",
+       x="Average Word Length",y="Density") +
   theme_minimal()
 plot
 ```
@@ -143,7 +147,9 @@ From the plot, we can see that the average word length in each song tends to be 
 plot = ggplot(data2,aes(x=AverageRhymeLength)) +
   geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
   geom_density(alpha=.2, fill="#FF6666") +
-  labs(title = "Histogram of Average Rhyme Length per Song",x="Average Rhyme Length",y="Density") + theme_minimal()
+  labs(title = "Histogram of Average Rhyme Length per Song",
+       x="Average Rhyme Length",y="Density") + 
+  theme_minimal()
 
 plot
 ```
@@ -336,15 +342,11 @@ fit = lm(Rank~Sentiment,data=data)
 summary(fit)
 ```
 
-So none of my lyrics columns are good predictors of Rank.
+Since none of my lyrics columns are good predictors of Rank, I think that using a classification model to predict genres from lyrics might prove more viable than a regression on rank.
 
 #### Genre {#genre}
 
-##### Cleaning Genre Data {#clean2}
-
 Next, let's use genre as the variable we are trying to predict.
-
-First we have to clean the genre data and create a singular genre column.
 
 ```{r definition,include=F}
 rap <- function(genre) {
@@ -354,24 +356,24 @@ rap <- function(genre) {
 ```
 
 
-```{r}
+```{r eval=T, include=F}
 tags = read.csv("genres.csv",header=T)
 
-# This has got to be the least efficient way to do this so if you have any suggestions, I am very open.
-list = c("rock","folk","country","/^hip*[a-z]./","soul","r&b","classic rock","smooth jazz",
-         "jazz","garage rock","punk","metal","folk rock","british","surf","fip","rap","hip hop",
-         "rnb","indie","indie rock","pop rock","soft rock","psychadelic",
-         "psychadelic","rock","electronic","synth pop","dance","funk",
-         "reggae","progressive rock","punk rock","hip-hop","love","hiphop","house","pop")
+list = c("rock","folk","country","/^hip*[a-z]./","soul","r&b","classic rock",
+         "smooth jazz","jazz","garage rock","punk","metal","folk rock","british",
+         "surf","fip","rap","hip hop","rnb","indie","indie rock",
+         "pop rock","soft rock","psychadelic","psychadelic","rock","electronic",
+         "synth pop","dance","funk","reggae","progressive rock","punk rock",
+         "hip-hop","love","hiphop","house","pop")
 
 
 # Find tags that match to those in list and put in genre column
 genres = tags %>% 
   mutate(genre = ifelse(str_trim(tolower(Tag1)) %in% list, str_trim(tolower(Tag1)),
-                        ifelse(str_trim(tolower(Tag2)) %in% list, str_trim(tolower(Tag2)),
-                               ifelse(str_trim(tolower(Tag3)) %in% list, str_trim(tolower(Tag3)),
-                                      ifelse(str_trim(tolower(Tag4)) %in% list, str_trim(tolower(Tag4)),
-                                             ifelse(str_trim(tolower(Tag5)) %in% list, str_trim(tolower(Tag5)),9999)))))) %>% 
+                 ifelse(str_trim(tolower(Tag2)) %in% list, str_trim(tolower(Tag2)),
+                 ifelse(str_trim(tolower(Tag3)) %in% list, str_trim(tolower(Tag3)),
+                 ifelse(str_trim(tolower(Tag4)) %in% list, str_trim(tolower(Tag4)),
+                 ifelse(str_trim(tolower(Tag5)) %in% list, str_trim(tolower(Tag5)),9999))))))  %>% 
   select(genre)
 
 
@@ -404,7 +406,6 @@ There are about 1200 pop songs, but pop is such a wide ranging genre that this s
 This cleans the genres with under 20 songs and creates binary columns representing the 17 genres.
 
 ```{r}
-
 genre_list = num_genre[num_genre$count > 20,] %>% mutate(X = row_number())
 
 clean_cut = clean_full[clean_full$genre %in% genre_list$genre,] %>% 
@@ -426,9 +427,21 @@ Now that we have our genre columns, we can try to predict the genre from the dif
 First lets try just the lyric data.
 
 ```{r}
-pop = final_data %>% select(genrepop,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+pop = final_data %>% select(genrepop,
+                            Rank,
+                            AverageWordLength,
+                            AverageRhymeLength,
+                            NumberWords,
+                            UniqueWords,
+                            Sentiment)
 
-fit = glm(genrepop ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=pop,family = "binomial")
+fit = glm(genrepop ~ Rank + 
+            AverageWordLength + 
+            AverageRhymeLength + 
+            NumberWords + 
+            UniqueWords + 
+            Sentiment,data=pop,family = "binomial")
+
 summary(fit)
 ```
 
@@ -459,9 +472,21 @@ The confusion matrix tells us that the model predicts that a song is not pop ver
 Using the same logic from above, here is the fit summary for predicting whether a song is rock or not.
 
 ```{r}
-rock = final_data %>% select(genrerock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+rock = final_data %>% select(genrerock,
+                             Rank,
+                             AverageWordLength,
+                             AverageRhymeLength,
+                             NumberWords,
+                             UniqueWords,
+                             Sentiment)
 
-fit = glm(genrerock ~ Rank + AverageWordLength + AverageRhymeLength + NumberWords + UniqueWords + Sentiment,data=rock,family = "binomial")
+fit = glm(genrerock ~ Rank + 
+            AverageWordLength + 
+            AverageRhymeLength + 
+            NumberWords + 
+            UniqueWords + 
+            Sentiment,data=rock,family = "binomial")
+
 summary(fit)
 ```
 
@@ -491,7 +516,13 @@ The last function I call is to prove that the model only predicts "Not Rock" (0)
 ```{r}
 notPop = final_data[final_data$genrepop == 0,]
 
-rock = notPop %>% select(genrerock,Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+rock = notPop %>% select(genrerock,
+                         Rank,
+                         AverageWordLength,
+                         AverageRhymeLength,
+                         NumberWords,
+                         UniqueWords,
+                         Sentiment)
 
 fit = glm(genrerock ~ Rank + NumberWords + Sentiment, data=rock,family = binomial)
 summary(fit)
@@ -526,7 +557,9 @@ And the confusion table.
 ```{r}
 probs = predict(fit,type="response")
 prediction = predict(fit)
-prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
+prediction = rep("Not Pop",
+                 nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
+
 prediction[probs > .5]="Pop"
 real = recode(aa$genrepop,"1"="Pop","0"="Not Pop")
 table(prediction,real)
@@ -560,8 +593,11 @@ dwplot(fit,vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2))
 Here is a probit regression for comparison.
 
 ```{r}
-fit = glm(genrepop ~ UniqueWords + Loudness:Tempo,data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],family = binomial(link="probit"))
-#summary(fit)
+fit = glm(genrepop ~ UniqueWords + Loudness:Tempo,
+          data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],
+          family = binomial(link="probit"))
+
+
 probs = predict(fit,type="response")
 prediction = predict(fit)
 prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
@@ -577,3 +613,16 @@ It seems that the coefficients in the probit regression are different from the l
 I had hoped that the results with the new independent columns would be better predictors of genre, but it seems that my data is not well enough suited to predict anything from the data. 
 
 I'm not really sure where I'll go from here, but I think I can find ways to better predict genre or rank.
+
+\newpage
+
+## Report 3 {#Report3}
+
+### Introduction {#intro3}
+
+Intro here.
+
+```{r}
+current_data = read.csv("data_Oct1st.csv",header=T)
+```
+
