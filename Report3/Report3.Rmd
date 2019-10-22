@@ -7,8 +7,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-# setwd("~/Desktop/GitHub/Econ490/Report3")
-setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
+setwd("~/Desktop/GitHub/Econ490/Report3")
+# setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(stringr)
@@ -73,6 +73,12 @@ library(tree)
 3. **[Report 3.](#Report3)**
 
   + *[Introduction](#intro3)*
+  
+  + *[Question 1.](#q1)*
+  
+  + *[Question 2.](#q2)*
+  
+  + *[Question 3.](#q3)*
   
 \newpage
 
