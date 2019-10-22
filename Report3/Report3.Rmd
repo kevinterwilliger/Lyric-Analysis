@@ -7,8 +7,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-setwd("~/Desktop/GitHub/Econ490/Report3")
-# setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
+# setwd("~/Desktop/GitHub/Econ490/Report3")
+setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(stringr)
@@ -17,6 +17,7 @@ library(ggplot2)
 library(dotwhisker)
 library(stats)
 library(xtable)
+library(tree)
 #library(reticulate)
 # new_data = read.csv("Data_and_feature.csv",header=T)
 ```
