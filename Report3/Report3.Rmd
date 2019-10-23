@@ -7,17 +7,18 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-# setwd("~/Desktop/GitHub/Econ490/Report3")
+setwd("~/Desktop/GitHub/Econ490/Report3")
 # setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
+library(glmnet)
 library(stringr)
 library(SentimentAnalysis)
 library(ggplot2)
 library(dotwhisker)
 library(stats)
 library(xtable)
-library(tree)
+# library(tree)
 #library(reticulate)
 # new_data = read.csv("Data_and_feature.csv",header=T)
 ```
@@ -629,62 +630,72 @@ I'm not really sure where I'll go from here, but I think I can find ways to bett
 
 Intro here.
 
-```{r}
+```{r include=F}
 current_data = read.csv("data_Oct1st.csv",header=T) %>% select(-c(1,2,3,4)) %>% filter(Loudness != 9999)
 ```
 
-### Question 1. Validation and Training Sets
+### Question 1. Validation and Training Sets {#q1}
 
 ```{r}
 train = current_data %>% select(2,c(8:18)) %>% sample_frac(0.7) 
 test = current_data %>% select(2,c(8:18)) %>% setdiff(train)
 ```
 
-### Question 2. Ridge and Lasso Regressions.
+### Question 2. Ridge and Lasso Regressions. {#q2}
+
+
 
 ```{r}
-library(leaps)
-regfit <- regsubsets(Rank ~ ., train,really.big = T)
-summary(regfit)
-```
-
-```{r}
-par(mfrow=c(2,2))
-plot(regfit, scale = 'adjr2')
-plot(regfit, scale = 'Cp')
-plot(regfit, scale = 'bic')
-coef(regfit,6)
-```
-
-```{r}
-library(glmnet)
 x = model.matrix(Rank~., train)[,-1]
 y = train$Rank
 grid = 10^seq(10, -2, length = 100)
-ridge_mod = glmnet(x, y, alpha = 0, lambda = grid)
 
-library(ggplot2)
+ridge = glmnet(x,y,alpha=0)
+plot(ridge,  xvar = "lambda")
+```
 
+```{r}
+set.seed(1)
+ridge_cv.out = cv.glmnet(x,y, alpha = 0)
+bestlam = ridge_cv.out$lambda.min
+bestlam
+```
+
+
+```{r}
+plot(ridge_cv.out)
+```
+
+```{r}
+predict(ridge_cv.out, type = "coefficients", s = bestlam)
+```
+
+```{r}
+x_train = model.matrix(Rank~., train)[,-1] 
+x_test = model.matrix(Rank~., test)[,-1]
+y_train = train$Rank
+y_test = test$Rank
+
+ridge_pred = predict(ridge_cv.out, s = bestlam, newx = x_test)
+mean((ridge_pred - y_test)^2)
+```
+
+```{r}
 ggplot() +
-  geom_point(aes(x = train$Rank, y = predict(ridge_mod, s = bestlam, newx = x)),
+  geom_point(aes(x = test$Rank, y = ridge_pred),
              colour = 'blue') +
-  geom_line(aes(x = train$Rank, y = train$Rank),
+  geom_line(aes(x = test$Rank, y = test$Rank),
             colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
   ggtitle('ridge predictions vs salary') +
   xlab('actual y') + ylab('predicted y')
+# compare to logit
+```
 
-set.seed(1)
-cv.out = cv.glmnet(x,y, alpha = 0) # Fit ridge regression model on training data
-bestlam = cv.out$lambda.min  # Select lamda that minimizes training MSE
-bestlam
 
-plot(cv.out)
+#### Lasso Regression {#yeehaw}
 
-# We are going to use the same train and test sets that we produced earlier 
-lasso_mod = glmnet(x, 
-                   y, 
-                   alpha = 1) # Fit lasso model on training data
-ls(lasso_mod)
+```{r}
+lasso_mod = cv.glmnet(x,y,alpha = 1)
 plot(lasso_mod,  xvar = "lambda")  
 
 set.seed(1)
@@ -706,6 +717,8 @@ ggplot() +
   ggtitle('ridge predictions vs salary') +
   xlab('actual y') + ylab('predicted y')
 ```
+
+### Question 3. Decision Tree {#q3}
 
 ```{r}
 t = tree(Rank ~ .,data=train)
