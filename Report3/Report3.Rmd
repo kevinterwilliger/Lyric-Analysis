@@ -1042,7 +1042,7 @@ boot = boot::boot(d,statistic=tree_gen,R=100)
 boot$t0
 ```
 
-So a bootstrap of my model has an error rate of 67%. I'm actually shocked. Compare this error rate to my single tree from above, and it is signficantly better. I'm not convinced, however, that the 67% of correct predictions are due to the model being correct -- I think that the sampling with replacement leads to higher proportions of "Not Pop" songs and the model still isn't predicting anything but "Not Pop". I'm not sure how to pursue this, I'll probably leave it for next time.
+So a bootstrap of my model has an error rate of 67%. I'm actually shocked. Compared this error rate to my single tree from above, it is signficantly better. I'm not convinced, however, that the 67% of correct predictions are due to the model being correct -- I think that the sampling with replacement leads to higher proportions of "Not Pop" songs and the model still isn't predicting anything but "Not Pop". I'm not sure how to pursue this, I'll probably leave it for next time.
 
 ### Conclusions {#conc3}
 
