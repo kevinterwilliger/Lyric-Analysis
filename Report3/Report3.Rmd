@@ -7,10 +7,13 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-setwd("~/Desktop/GitHub/Econ490/Report3")
-# setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
+# setwd("~/Desktop/GitHub/Econ490/Report3")
+setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
+# library(emo)
+library(tree)
 knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
+library(gridExtra)
 library(glmnet)
 library(stringr)
 library(SentimentAnalysis)
@@ -75,11 +78,49 @@ library(xtable)
 
   + *[Introduction](#intro3)*
   
-  + *[Question 1.](#q1)*
+  + *[Question 1. Train and Test Subsets](#q1)*
   
-  + *[Question 2.](#q2)*
+  + *[Question 2. Ridge and Lasso Regressions](#q2)*
+  
+    + [Ridge Regression](#ridge)  
+  
+      - [Tuning the Model](#r2a)
+      
+      - [Truly the Best Lambda](#r2b)
+      
+      - [Cross-Validation and Lambda](#r2c)
+      
+      - [Coefficients](#r2d)
+      
+      - [Coefficients of the Best Lambda](#r2e)
+      
+      - [Testing the Model](#r2f)
+    
+    + [Lasso Regression](#yeehaw)
+    
+      - [Tuning the Model](#l2a)
+      
+      - [Truly the Best Lambda](#l2b)
+      
+      - [Cross-Validation and Lambda](#l2c)
+      
+      - [Coefficients](#l2d)
+      
+      - [Coefficients of the Best Lambda](#l2e)
+      
+      - [Testing the Model](#l2f)
   
   + *[Question 3.](#q3)*
+    
+    - [The Tree](#TREE)
+    
+    - [Pruning the Tree](#TREEa)
+    
+    - [Plotting the Pruned Tree](#sad)
+  
+  + *[Extra Credit](#ec)*
+  
+  + *[Conclusion](#conc3)*
   
 \newpage
 
@@ -279,6 +320,7 @@ I really want to make this project work. So far it seems likely that the linear 
 
 
 ## Report 2 {#Report2}
+
 ```{r include=F}
 data = read.csv("data_and_feature_Clean.csv",header = T)
 ```
@@ -393,6 +435,7 @@ clean_full = data_genres[data_genres$genre != 9999,] %>%
          track = paste(Song,Artist,sep = " ")) %>%
   filter(track %in% data$track)
 
+write.csv(clean_full,file="data_oct23.csv")
 ```
 
 Due to the nature of the API, I ended up dropping around 187 songs, but that leaves us with 3931 rows of song data, genre included. Lets look at the spread of the genres.
@@ -628,103 +671,379 @@ I'm not really sure where I'll go from here, but I think I can find ways to bett
 
 ### Introduction {#intro3}
 
-Intro here.
-
 ```{r include=F}
-current_data = read.csv("data_Oct1st.csv",header=T) %>% select(-c(1,2,3,4)) %>% filter(Loudness != 9999)
+# Read in most current data and remove junk columns
+current_data = read.csv("data_Oct23.csv",header=T) %>% select(-c(1,2,3,4)) %>%
+  filter(Loudness != 9999) # remove rows where spotify couldn't find track
+colnames(current_data)
+dim(current_data)
 ```
+
+This data has less than half of the observations as the complete dataset, but looking at the histogram of genres, we should have enough to perform classification of pop songs.
+
+```{r}
+num_genre = current_data %>% group_by(genre) %>% 
+  summarise(count=n()) %>% 
+  select(genre,count)
+
+genreplot = num_genre[num_genre$count > 20,] %>%
+    ggplot(., aes(x=genre, y=count, fill=genre)) +
+    geom_bar(stat="identity")+theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = 'none')
+
+genreplot
+```
+
+I already ran ridge and lasso models on a linear regression trying to predict Rank. Here's the prediction results plotted against the actual for both.
+
+```{r echo=F}
+
+train_ = current_data %>% select(genre,Rank,c(8:18)) %>% sample_frac(0.6) 
+test_ = current_data %>% select(genre,Rank,c(8:18)) %>% setdiff(train_)
+
+tr = train_ %>% select(-c(genre))
+te = test_ %>% select(-c(genre))
+
+x = model.matrix(Rank~., tr)[,-1]
+y = tr$Rank
+grid = 10^seq(10, -2, length = 100)
+
+set.seed(1)
+ridge_cv.out = cv.glmnet(x,y, alpha = 0)
+bestlam = ridge_cv.out$lambda.1se
+
+x_train = model.matrix(Rank~., tr)[,-1] 
+x_test = model.matrix(Rank~., te)[,-1]
+y_train = tr$Rank
+y_test = te$Rank
+
+ridge_pred = predict(ridge_cv.out, s = bestlam, newx = x_test)
+
+ridge_plot = ggplot() +
+  geom_point(aes(x = te$Rank, y = ridge_pred),
+             colour = 'blue') +
+  geom_line(aes(x = te$Rank, y = te$Rank),
+            colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
+  ggtitle('ridge predictions vs salary') +
+  xlab('actual y') + ylab('predicted y')
+
+
+lasso_cv.out = cv.glmnet(x,y, alpha = 1)
+bestlam = lasso_cv.out$lambda.1se
+
+x_train = model.matrix(Rank~., tr)[,-1] 
+x_test = model.matrix(Rank~., te)[,-1]
+y_train = tr$Rank
+y_test = te$Rank
+
+lasso_pred = predict(lasso_cv.out, s = bestlam, newx = x_test)
+
+lasso_plot = ggplot() +
+  geom_point(aes(x = te$Rank, y = lasso_pred),
+             colour = 'blue') +
+  geom_line(aes(x = te$Rank, y = te$Rank),
+            colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
+  ggtitle('ridge predictions vs salary') +
+  xlab('actual y') + ylab('predicted y')
+
+
+grid.arrange(ridge_plot,lasso_plot,ncol=2)
+```
+
+Obviously, Rank is not going to work for any kind of regression. I think it's due the to fact that Rank is uniformly distributed. The models can minimize their RSS and objective functions by setting the intercept to 50 and the coefficients to such small numbers that the prediction will always be around 50. It's unfortunate, hopefully non-linear models will work better.
+
+Either way, I used a classification variable for the ridge and lasso models.
 
 ### Question 1. Validation and Training Sets {#q1}
 
+I let my training data include the majority of the data. Here's the distribution of genres among the two sets.
+
 ```{r}
-train = current_data %>% select(2,c(8:18)) %>% sample_frac(0.7) 
-test = current_data %>% select(2,c(8:18)) %>% setdiff(train)
+train_ = current_data %>% 
+  select(genre,Rank,c(8:18)) %>% 
+  sample_frac(0.6) 
+test_ = current_data %>% 
+  select(genre,Rank,c(8:18)) %>% 
+  setdiff(train_)
+par(mfrow=c(2,1))
+
+train_genres = train_ %>% group_by(genre) %>% 
+  summarise(count=n()) %>% 
+  filter(count > 20) %>%
+    ggplot(., aes(x=genre, y=count, fill=genre)) +
+    geom_bar(stat="identity")+theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = 'none') +
+    ggtitle("Distribution of Genres in Train Data")
+
+test_genres = test_ %>% group_by(genre) %>% 
+  summarise(count=n()) %>% 
+  filter(count > 20) %>%
+    ggplot(., aes(x=genre, y=count, fill=genre)) +
+    geom_bar(stat="identity")+theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = 'none') +
+    ggtitle("Distribution of Genres in Test Data")
+
+grid.arrange(train_genres, test_genres, ncol=2)
 ```
+
+This following chunk creates a binary column for whether a song is of genre "Pop" or not. I use "-1" instead of "0" for better results.
+
+```{r include=T}
+train_$IsPop = ifelse(train_$genre == "pop",1,-1)
+test_$IsPop = ifelse(test_$genre == "pop",1,-1)
+```
+
 
 ### Question 2. Ridge and Lasso Regressions. {#q2}
 
+Given that Rank proves to be unpredictable through linear models, I will preform ridge and lasso regressions on the binary variable, IsPop.
 
-
-```{r}
-x = model.matrix(Rank~., train)[,-1]
-y = train$Rank
-grid = 10^seq(10, -2, length = 100)
-
-ridge = glmnet(x,y,alpha=0)
-plot(ridge,  xvar = "lambda")
+```{r include=F}
+train = train_ %>% select(-c(genre,Rank))
+test = test_ %>% select(-c(genre,Rank))
 ```
 
+#### Ridge Regression {#ridge}
+
+##### Question 2a. Tuning the model. {#r2a}
+
 ```{r}
-set.seed(1)
-ridge_cv.out = cv.glmnet(x,y, alpha = 0)
-bestlam = ridge_cv.out$lambda.min
+x = model.matrix(IsPop~., train)[,-1]
+y = train$IsPop
+grid = 10^seq(10, -2, length = 100)
+
+ridge.cv = cv.glmnet(x,y,alpha=0)
+```
+
+After running the cross-validated model, the $\lambda$ that minimizes the RSS/objective function is:
+
+```{r echo=F}
+bestlam = ridge.cv$lambda.min
 bestlam
 ```
 
+##### Question 2b. The Truly Best Lambda {#r2b}
+
+In practice, we use the best lambda 1 standard error away from the minimum $\lambda$.
 
 ```{r}
-plot(ridge_cv.out)
+bestlam = ridge.cv$lambda.1se
+bestlam
 ```
+
+Honestly, it strikes me as odd that the two $\lambda$'s are so far apart. I wonder why.
+
+##### Question 2c. Cross-Validation and the Truly Best Lambda {#r2c}
 
 ```{r}
-predict(ridge_cv.out, type = "coefficients", s = bestlam)
+plot(ridge.cv)
 ```
+
+Well that would be why.
+
+##### Question 2d. Coefficients {#r2d}
+
+Running a normal Ridge Regression, here's how the coefficients vary as $\lambda$ increases:
 
 ```{r}
-x_train = model.matrix(Rank~., train)[,-1] 
-x_test = model.matrix(Rank~., test)[,-1]
-y_train = train$Rank
-y_test = test$Rank
-
-ridge_pred = predict(ridge_cv.out, s = bestlam, newx = x_test)
-mean((ridge_pred - y_test)^2)
+ridge = glmnet(x,y,alpha=0)
+plot(ridge,xvar="lambda")
 ```
+
+
+##### Question 2e. Coefficients of the Best Lambda{#r2e}
+
+And here are the coefficients for the $\lambda$ one SE from the minimum $\lambda$: 
 
 ```{r}
-ggplot() +
-  geom_point(aes(x = test$Rank, y = ridge_pred),
-             colour = 'blue') +
-  geom_line(aes(x = test$Rank, y = test$Rank),
-            colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
-  ggtitle('ridge predictions vs salary') +
-  xlab('actual y') + ylab('predicted y')
-# compare to logit
+predict(ridge.cv, type = "coefficients", s = bestlam)
 ```
 
+##### Question 2f. Testing the Model {#r2f}
+
+Using the Test subset to generate predictions from the model, we can generate the truth table of the model.
+
+```{r}
+x_train = model.matrix(IsPop~., train)[,-1] 
+x_test = model.matrix(IsPop~., test)[,-1]
+y_train = train$IsPop
+y_test = test$IsPop
+
+
+ridge_pred = predict(ridge.cv, s = bestlam, newx = x_test)
+prediction = rep("Not Pop",nrow(ridge_pred))
+prediction[ridge_pred > 0]="Pop"
+real = recode(test$IsPop,"1"="Pop","-1"="Not Pop")
+table(prediction,real)
+```
+
+If you remember the second report, I ran into this issue, where the model only predicts "Not Pop". Hopefully Lasso might prove more helpful.
+
+In comparison to my Logit regressions, I get the same outcome, so comparing them seems uneccessary.
 
 #### Lasso Regression {#yeehaw}
 
+Using the same binary column, IsPop, let's see if a Lasso model proves more useful.
+
+##### Question 2a. Tuning the model. {#l2a}
+
 ```{r}
-lasso_mod = cv.glmnet(x,y,alpha = 1)
-plot(lasso_mod,  xvar = "lambda")  
+x = model.matrix(IsPop~., train)[,-1]
+y = train$IsPop
+grid = 10^seq(10, -2, length = 100)
 
-set.seed(1)
-cv.out = cv.glmnet(x, y, alpha = 1) # Fit lasso model on training data
-plot(cv.out) # Draw plot of training MSE as a function of lambda
-
-x_test = model.matrix(Rank~., test)[,-1]
-y_test = test$Rank
-
-bestlam = cv.out$lambda.min # Select lamda that minimizes training MSE
-lasso_pred = predict(lasso_mod, s = bestlam, newx = x_test) # Use best lambda to predict test data
-mean((lasso_pred - y_test)^2) # Calculate test MSE
-
-ggplot() +
-  geom_point(aes(x = test$Rank, y = lasso_pred),
-             colour = 'blue') +
-  geom_line(aes(x = test$Rank, y = test$Rank),
-            colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
-  ggtitle('ridge predictions vs salary') +
-  xlab('actual y') + ylab('predicted y')
+lasso.cv = cv.glmnet(x,y,alpha=1)
 ```
+
+After running the cross-validated model, the $\lambda$ that minimizes the RSS/objective function is:
+
+```{r echo=F}
+bestlam = lasso.cv$lambda.min
+bestlam
+```
+
+##### Question 2b. The Truly Best Lambda {#l2b}
+
+In practice, we use the best lambda 1 standard error away from the minimum $\lambda$.
+
+```{r}
+bestlam = lasso.cv$lambda.1se
+bestlam
+```
+
+Again, these $\lambda$s are strange, this time they are incredibly close together, but very small.
+
+##### Question 2c. Cross-Validation and the Truly Best Lambda {#l2c}
+
+```{r}
+plot(lasso.cv)
+```
+
+I'm curious why there is a bump just before the minimum $\lambda$, but this plot does explain why the $\lambda$s are so small, the minimizing $\lambda$ is ~$e^{-3}$ and the $\lambda$ 1 SE from the minimum is not much larger.
+
+##### Question 2d. Coefficients {#l2d}
+
+Running a normal Ridge Regression, here's how the coefficients vary as $\lambda$ increases:
+
+```{r}
+lasso = glmnet(x,y,alpha=1)
+plot(ridge,xvar="lambda")
+```
+
+
+##### Question 2e. Coefficients of the Best Lambda {#l2e}
+
+And here are the coefficients for the $\lambda$ one SE from the minimum $\lambda$: 
+
+```{r}
+predict(lasso.cv, type = "coefficients", s = bestlam)
+```
+
+Well. That's... I'm not sure what I expected, but this isn't to far from it. I'll finish the rest of the section, but everything else I do from here will be meaningless (because the model only includes the intercept).
+
+
+##### Question 2f. Testing the Model {#l2f}
+
+Using the Test subset to generate predictions from the model, we can generate the truth table for the model.
+
+```{r}
+x_train = model.matrix(IsPop~., train)[,-1] 
+x_test = model.matrix(IsPop~., test)[,-1]
+y_train = train$IsPop
+y_test = test$IsPop
+
+
+lasso_pred = predict(lasso.cv, s = bestlam, newx = x_test)
+lasso_prediction = rep("Not Pop",nrow(lasso_pred))
+lasso_prediction[lasso_pred > 0]="Pop"
+real = recode(test$IsPop,"1"="Pop","-1"="Not Pop")
+table(lasso_prediction,real)
+```
+
+This is actually funny. The coefficients of the ridge model are so negligible that if you didn't factor them in, the predictions wouldn't change. I know this because we can run the following code to show the predictions are the same for the intercept-only lasso model and the ridge model.
+
+```{r}
+unique(prediction == lasso_prediction)
+```
+
+So linear models prove useless for predicting Rank and IsPop. Next, our first non-linear model, binary trees! 
 
 ### Question 3. Decision Tree {#q3}
 
+I've run both of the following trees many times. Sometimes the algorithm never splits and leaves me with an empty tree, other times it splits by 5 or 6 variables. I'll write the following assuming the trees are non-empty.
+
+#### The Tree {#TREE}
+
+First to create our tree. I'm going to try to predict IsPop.
+
+#### Question 3a. Pruning the Tree {#TREEa}
+
 ```{r}
-t = tree(Rank ~ .,data=train)
-summary(t)
-plot.new()
-plot(t)
-text(t,pretty=0)
+tree_train = train_ %>% select(-c(Rank,genre))
+tree_train$IsPop = as.factor(ifelse(tree_train$IsPop >= 0, "Pop","Not Pop"))
+tree_test = test_ %>% select(-c(Rank,genre))
+tree_test$IsPop = as.factor(ifelse(tree_test$IsPop >= 0, "Pop","Not Pop"))
+
+t2 = tree(IsPop ~ .,data = tree_train)
+summary(t2)
 ```
 
+Hey this model has a split! Let's see if it can predict anything!
+
+```{r}
+tree_pred = predict(t2, tree_test, type = "class")
+table(tree_pred, tree_test$IsPop)
+```
+
+Not terrible, I think.
+
+#### Question 3b. Plotting the Pruned Tree {#sad}
+
+```{r}
+t2_pruned = tryCatch(cv.tree(IsPop ~ .,data=tree_train),
+         warning=NULL,
+         error = function(e) {print(e)},
+         finally= NULL)
+
+if(length(t2_pruned) <= 2 | is.null(t2_pruned)) {
+  print("Tree is illigitimate, whatever that means")
+} else {
+  plot(t2_pruned) + text(t2_pruned,pretty = 0)
+}
+```
+
+I'm not sure, but I keep getting an error saying that the tree is not a "legitimate" tree. I'll use the if statement to catch it, hopefully the tree is legitimate.
+
+I've been getting different splits on the second tree everytime I run, so I'll still do the extra credit, even if it's seemingly pointless. Hopefully reading this has been more fun than writing it haha.
+:(.
+
+### Extra Credit {#ec}
+```{r}
+tree_gen = function(data,indices) {
+  d = data[indices,]
+  t = tree(IsPop ~ .,data=d)
+  t_pred = predict(t,d,type="class")
+  correct = sum(t_pred == d[,"IsPop"])
+  return(correct/nrow(d))
+}
+```
+
+Using the above function as the statistic in the bootstrap, we can generate 100 trees to find the aggregated error rate.
+
+```{r}
+d = current_data %>% 
+  mutate(IsPop = ifelse(genre == "pop","Pop","Not Pop")) %>% 
+  select(IsPop,c(8:18))
+d$IsPop = as.factor(d$IsPop)
+boot = boot::boot(d,statistic=tree_gen,R=100)
+boot$t0
+```
+
+So a bootstrap of my model has an error rate of 67%. I'm actually shocked. Compare this error rate to my single tree from above, and it is signficantly better. I'm not convinced, however, that the 67% of correct predictions are due to the model being correct -- I think that the sampling with replacement leads to higher proportions of "Not Pop" songs and the model still isn't predicting anything but "Not Pop". I'm not sure how to pursue this, I'll probably leave it for next time.
+
+### Conclusions {#conc3}
+
+I'm not sure how much hope I have for random forest or bagging, but hopefully they prove more helpful than everything above. I was hoping that this project would have more interesting results, but it seems that this kind of machine learning is not proficient at these kind of estimations.
