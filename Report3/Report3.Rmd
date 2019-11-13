@@ -7,8 +7,8 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-# setwd("~/Desktop/GitHub/Econ490/Report3")
-setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
+setwd("~/Desktop/GitHub/Econ490/Report3")
+# setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report3")
 # library(emo)
 library(tree)
 knitr::opts_chunk$set(echo = TRUE)
@@ -1003,7 +1003,7 @@ Not terrible, I think.
 #### Question 3b. Plotting the Pruned Tree {#sad}
 
 ```{r}
-t2_pruned = tryCatch(cv.tree(IsPop ~ .,data=tree_train),
+t2_pruned = tryCatch(cv.tree(t2,FUN=tree.prune,K = 10),
          warning=NULL,
          error = function(e) {print(e)},
          finally= NULL)
