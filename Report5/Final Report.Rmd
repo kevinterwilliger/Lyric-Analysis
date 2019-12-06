@@ -1,0 +1,1379 @@
+---
+title: "Predicting Song Popularity from Characteristics of Lyrics"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+# setwd("~/Desktop/GitHub/Econ490/Report3")
+setwd("C:/Users/Kevin/Desktop/Github/Econ490/Report4")
+# library(emo)
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(gridExtra)
+library(glmnet)
+library(stringr)
+library(SentimentAnalysis)
+library(ggplot2)
+library(dotwhisker)
+library(stats)
+library(xtable)
+library(tree)
+library(randomForest)
+library(gbm)
+library(xgboost)
+library(keras)
+library(reticulate)
+# new_data = read.csv("Data_and_feature.csv",header=T)
+```
+
+## Table of Contents (Clickable!)
+
+1. **[Report 1.](#Report1)**
+
+  + *[Introduction](#intro1)*
+  
+  + *[Cleaning the Data](#clean)*
+  
+  + *[Examining the Data](#examine)*
+  
+  + *[Correlation of Variables](#corr)*
+  
+  + *[Conclusion](#conc)*
+
+2. **[Report 2.](#Report2)**
+
+  + *[Introduction](#intro2)*
+  
+  + *[Regressions](#reg)*
+    
+    - [Rank](#rank)
+    
+      * [Average Word Length](#awl)
+    
+      * [Average Rhyme Length](#arl)
+    
+      * [Number of Words](#nw)
+    
+      * [Unique Words](#uw)
+      
+      * [Sentiment](#sent)
+      
+    - [Genre](#genre)
+    
+      * [Cleaning Genre Data](#clean2)
+      
+      * [Predicting Pop Songs](#pop)
+      
+      * [Predicting Rock Songs](#rock)
+      
+      * [Predicting Audio Analysis](#aa)
+      
+      * [Standard Errors](#se)
+      
+      * [Probit Regression](#pr)
+      
+  + *[Conclusion](#conc2)*
+  
+3. **[Report 3.](#Report3)**
+
+  + *[Introduction](#intro3)*
+  
+  + *[Question 1. Train and Test Subsets](#q1)*
+  
+  + *[Question 2. Ridge and Lasso Regressions](#q2)*
+  
+    + [Ridge Regression](#ridge)  
+  
+      - [Tuning the Model](#r2a)
+      
+      - [Truly the Best Lambda](#r2b)
+      
+      - [Cross-Validation and Lambda](#r2c)
+      
+      - [Coefficients](#r2d)
+      
+      - [Coefficients of the Best Lambda](#r2e)
+      
+      - [Testing the Model](#r2f)
+    
+    + [Lasso Regression](#yeehaw)
+    
+      - [Tuning the Model](#l2a)
+      
+      - [Truly the Best Lambda](#l2b)
+      
+      - [Cross-Validation and Lambda](#l2c)
+      
+      - [Coefficients](#l2d)
+      
+      - [Coefficients of the Best Lambda](#l2e)
+      
+      - [Testing the Model](#l2f)
+  
+  + *[Question 3.](#q3)*
+    
+    - [The Tree](#TREE)
+    
+    - [Pruning the Tree](#TREEa)
+    
+    - [Plotting the Pruned Tree](#sad)
+  
+  + *[Extra Credit](#ec)*
+  
+  + *[Conclusion](#conc3)*
+
+4. **[Report 4.](#report4)**
+
+  + *[Introduction](#intro4)*
+
+  + *[Question 1.](#t4q1)*
+  
+  + *[Question 2.](#t4q2)*
+  
+    - [Question 2a.](#t4q2a)
+    
+    - [Question 2b.](#t4q2b)
+    
+    - [Question 2c.](#t4q2c)
+    
+    - [Question 2d.](#t4q2d)
+  
+  + *[Question 3.](#t4q3)*
+  
+    - *[Question 3a.](#t4q3a)*
+    
+    - *[Question 3b.](#t4q3b)*
+    
+    - *[Question 3c.](#t4q3c)*
+    
+    - *[Question 3d.](#t4q3d)*
+    
+    - *[Question 3e.](#t4q3e)*
+    
+    - *[Question 3f.](#t4q3f)*
+  
+  + *[Question 4.](#t4q4)*
+  
+    - *[Question 4a.](#t4q4a)*
+    
+    - *[Question 4b.](#t4q4b)*
+    
+    - *[Question 4c.](#t4q4c)*
+  
+  + *[Question 5.](#t4q5)*
+    
+    - *[Question 5a.](#t4q5a)*
+    
+    - *[Question 5b.](#t4q5b)*
+    
+    - *[Question 5c.](#t4q5c)*
+    
+  + *[Conclusion](#t4conc)*
+    
+\newpage
+
+## Report 1 {#Report1}
+
+### Introduction {#intro1}
+I listen to a lot of music. I've never really had a musical bone in my body so I tend to gravitate toward the lyrics of a song (which is a reason why you'll never find an EDM song in my playlists). After finding a dataset on Kaggle containing the lyrics of Billboard's Hot100 year-end chart from 1964-2015, I decided that it would be interesting to use the lyrics to try to predict a given song's success on the BillBoard Hot100. The Hot100 is just a list of the most popular songs of the given year ranked from 1 (most popular) to 100 (100-most popular).
+
+### Cleaning the Data {#clean}
+
+Here's what my original data set looked like.
+```{r}
+original_data = read.csv("../Report1/billboard_lyrics_1964-2015.csv")
+names(original_data)
+# head(original_data)
+original_data[1:5,] %>% select(Rank,Song,Artist,Year) # Excluding Lyrics
+```
+
+I decided that I wanted to come up with more columns to better interpret lyrics and had to come up with some independent variables on my own. I wrote a python script to help me. The script, which is below, imports the lyrics from the data set and finds the number of words, average word length, average rhyme length, and number of unique words in the given lyrics. 
+
+(I've moved the code to [this github](https://github.com/kevinterwilliger/Lyric-Analysis) if you want to see the new and updated python scripts.)  
+
+*https://github.com/kevinterwilliger/Lyric-Analysis*  
+  
+
+After saving as a csv, I imported the new data frame into R and used a package called [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to calculate a sentiment score for each of the lyrics. Here's the code:
+
+```{r include=F, eval=F}
+data1 = read.csv("data_new.csv")
+data1 = data1 %>%
+  mutate("Sentiment" = analyzeSentiment(as.character(Lyrics))$SentimentQDAP) %>%
+  rename("AverageWordLength" = AverageLengths)
+write.csv(data,"data_clean.csv")
+```
+
+Here are the Xs broken down:
+
+1. **Number of words** - This one should be pretty self-explanatory: How many words (non-unique included) does the song contain?
+
+2. **Average Word Length** - Does the songwriter use lengthier words or smaller words? The script gets this by adding all the characters in the lyrics and dividing by the total number of words in the lyrics.
+
+3. **Average Rhyme Length** - I had to use a handy library I found to compute this one. I'll link the github at the end, but here's a quick rundown of how it works: &nbsp;
+  * Go through lyrics word for word, using eSpeak to get the phonetic make-up of each word.
+
+  * For every word, find the longest matching rhyme sequence from the last 15 words. This is what captures the length of the rhyme. Since eSpeak converts all the words to phonetics (and I think just vowel phonetics) only vowels are compared, which is what gives the program something to match. Essentially, the program searches for the longest matching vowel sequence for last X words, where I used an arbitrary 15 words for X.
+
+  * Find the average rhyme length by summing all the lengths and dividing by the number of rhymes.
+[Here's the github](https://github.com/ekQ/raplysaattori)
+
+4. **Number of Unique Words** - I used python's dictionaries to keep track of the number of unique words in each song. Easy enough.
+
+5. **Sentiment** - I'm not entirely sure what algorithm is used in this package, but I used the analyzeSentiment function from  [SentimentAnalysis](https://cran.r-project.org/web/packages/SentimentAnalysis/vignettes/SentimentAnalysis.html#sentimentdictionarywordlist) to get each number. The sentiment is a score that gives the general "emotion" score of a word or series of words from -1 to 1. A negative score correlates to a more negative emotion, whether angry, sad, or both. Positive scores would work in the reverse, the higher the score, the more positive the sentiment expressed in the lyrics is.
+ 
+### Examining the Data {#examine}
+
+I'll plot the three most interesting of the X's that I mentioned above: Average Word Length, Average Rhyme Length, and Sentiment. Let's start with Average Word Length.
+
+```{r}
+data2 = read.csv("data_clean.csv")
+head(data2)
+plot = ggplot(data2,aes(x=AverageWordLength)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
+  geom_density(alpha=.2, fill="#FF6666") +
+  labs(title = "Histogram of Average Word Length per Song",
+       x="Average Word Length",y="Density") +
+  theme_minimal()
+plot
+```
+
+From the plot, we can see that the average word length in each song tends to be between 3 letters and 5 letters. I wonder how this histogram differs from the average word length of all english words. My best guess is that this graph is shifted left: not that many songs use words like supercalifragilisticexpialidocious. Next, Average Rhyme Length.
+
+```{r}
+plot = ggplot(data2,aes(x=AverageRhymeLength)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
+  geom_density(alpha=.2, fill="#FF6666") +
+  labs(title = "Histogram of Average Rhyme Length per Song",
+       x="Average Rhyme Length",y="Density") + 
+  theme_minimal()
+
+plot
+```
+
+So the average rhyme length in the songs is around 1 vowel-phonetic per rhyme. I am curious to see how this might correlate to genre (as a hip-hop fan, I hope that rap might have longer rhymes than pop or country). 
+
+And Sentiment.
+
+```{r}
+plot = ggplot(data2,aes(x=Sentiment)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins=30) +
+  geom_density(alpha=.2, fill="#FF6666") +
+  labs(title = "Histogram of Sentiment of Song",x="Sentiment",y="Density") +
+  theme_minimal()
+plot
+```
+
+So most songs tend to skew positive, I guess that's not terribly surprising. And finally, Rank on Billboard Hot100. This is technically a discrete variable, but it has 100 values so a histogram works better. 
+
+```{r}
+plot = ggplot(data2,aes(x=Rank)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins=100) +
+  geom_density(alpha=.2, fill="#FF6666") +
+  labs(title = "Histogram of Rank of Songs on Billboard Hot100",x="Rank",y="Density") +
+  theme_minimal()
+plot
+# I am curious why the histogram isn't totally uniform, as it should be. TODO: Find out why
+```
+
+The question above actually has two answers. The first is because this "data" is cleaned to remove any junk values I appended in the script, therefore having less that 50*100 rows and a non-uniform histogram. The other answer I will show below.
+
+```{r}
+# get the count of every song/artist combination
+proof = data2 %>%
+  mutate(track = paste(Song,Artist,sep=" ")) %>%
+  group_by(track) %>%
+  summarise(n = n()) %>%
+  filter(n > 1)
+# Checking for duplicates
+proof
+```
+
+So there are 195 duplicates. Out of curiosity, are these duplicates an error by whoever created the dataset?
+
+```{r}
+data2$Year[data2$Song == "100 pure love"]
+```
+
+I'm going to say that the creator did nothing wrong and that the vast majority, if not all, duplicates are caused by songs being popular for more than just one year. I think I will remove duplicates in the future.
+
+```{r echo=F,include=T}
+data_ = read.csv("data_and_feature.csv",header=T)
+new = data_ %>%
+  mutate(track = paste(Song,Artist,sep=" "))
+
+data2 = new[!new$track %in% proof$track,] %>% select(-c(X.2,X.1,X,Unnamed..0))
+# write.csv(data2,"data_and_feature_Clean.csv")
+```
+
+
+### Correlation of Variables {#corr}
+
+```{r,warning=F}
+d = data2 %>% dplyr::select(Rank,AverageWordLength,AverageRhymeLength,NumberWords,UniqueWords,Sentiment)
+scatter.smooth(d$Rank ~ d$AverageWordLength,data=d)
+```
+
+Not a high correlation.
+
+```{r}
+scatter.smooth(d$Rank ~ d$AverageRhymeLength)
+```
+
+Agian, low.
+
+```{r}
+scatter.smooth(d$Rank ~ d$Sentiment)
+```
+
+Yeah, so not good. I can't say I'm surprised, but there has got to be a way for me to get better predictions from these variables. First, maybe a binary prediction variable will prove better.
+
+```{r}
+binary = data_ %>%
+  mutate(Top50 = ifelse(Rank <= 50,1,0)) %>%
+  select(Top50,AverageWordLength,AverageRhymeLength,Sentiment,NumberWords,UniqueWords)
+
+plot = ggplot(binary,aes(x=Top50)) +
+  geom_histogram(aes(y=..density..), colour="black", fill="white",bins=100) +
+  geom_density(alpha=.2, fill="#FF6666") +
+  labs(title = "Histogram of Binary Variable Top50",x="Top50",y="Density") +
+  theme_minimal()
+plot
+```
+
+OK good, a 50-50(ish) split is what we wanted.
+
+```{r echo=F,error=F,warning=F}
+boxplot(AverageWordLength ~ Top50,data=binary)
+```
+
+Oof. Not good.
+
+```{r warning=F}
+boxplot(AverageRhymeLength ~ Top50,data=binary)
+```
+
+This is not an improvement.
+
+```{r warning=F}
+boxplot(Sentiment ~ Top50,data=binary)
+```
+
+
+Yeah so not better. In the next report, I will be adding a few more columns, one of them being genre of the song. I will probably try to predict genre from the other columns, hopefully it will work better.
+
+### Concluding Thoughts {#conc}
+
+I really want to make this project work. So far it seems likely that the linear regressions and logistic regressions in report 2 will prove to be inept at predicting Rank or Top50. As I write this conclusion, I am trying to finalize the script I mentioned above, but it relys on some APIs that are proving to be difficult. I think that trying to predict genre from variables like average rhyme length or unique words might prove more successful than predicting popularity. If the graders have any recommendations on possible Y/X variables, I'd very much appreciate the outside input. Other than that, here is report 2!
+
+
+## Report 2 {#Report2}
+
+```{r include=F}
+data = read.csv("data_and_feature_Clean.csv",header = T)
+```
+
+### Introduction {#intro2}
+
+Due to the fact that any linear regressions trying to predict the popularity of a song from the aforementioned independent variables are very underwhelming, I wrote some more python scripts (that can be found at [https://github.com/kevinterwilliger/Lyric-Analysis](https://github.com/kevinterwilliger/Lyric-Analysis)) to collect more variables such as the key or mode of a song and the genres of a song. I used the [Spotipy](https://spotipy.readthedocs.io/en/latest/) library to collect an audio analysis of the song that contains the following variables:
+
+1. **Loudness** - The overall loudness (decibels, dB) of a song.
+
+2. **Tempo** - The beats per minute of the song.
+
+3. **Key** - The estimated overall key of the song. Ranges in values from 0-11 mapping to pitches, using the standard Pitch Class Notation.
+
+4. **Mode** - Binary variable where "0" is Minor and "1" is in Major
+
+5. **Time Signiture** - The "meter" of a song is measured by the number beats in each bar. Values range from 3-7 and indicate "$\frac{3}{4}$"-"$\frac{7}{4}$".
+
+Using the Last.FM API, I was able to collect the top 5 user tags corresponding to each song. I collected 5 tags due to the fact that tags do not always contain the genre, but most songs have the specific genre in one of the 5 tags. I will explain my process for narrowing the tags down further in the report.
+
+
+
+### Regressions {#reg}
+
+#### Rank {#rank}
+
+Let's start with running some regressions on Rank. The results are not great, but I expected this due to the fact popularity probably is not dictated by the contents of the lyrics. We'll touch on Genre after.
+
+##### Average Word Length {#awl}
+
+```{r}
+fit = lm(Rank ~ AverageWordLength, data=data)
+summary(fit)
+```
+
+From the above summary, the R-squared of the linear regression of average word length on rank is 0.00005306. This is such a bad R-squared that it is clear that average word length has almost no bearing on how popular a song will be.
+
+##### Average Rhyme Length {#arl}
+
+```{r}
+fit = lm(Rank ~ AverageRhymeLength,data=data)
+summary(fit)
+```
+
+Again, a terrible R-squared. It is interesting, though, that average rhyme length has a tiny negative relationship toward rank.
+
+##### Number of Words {#nw}
+
+```{r}
+fit = lm(Rank ~ NumberWords, data=data)
+summary(fit)
+```
+
+I would expect a small or negative relationship from this due to the fact that long songs do not often recieve as many listens as shorter songs.
+
+##### Number of Unique Words {#uw}
+
+```{r}
+fit = lm(Rank ~ UniqueWords, data = data)
+summary(fit)
+```
+
+This is the most significant variable, it being able to pass a 85% significance test. It is a shame, though, that the R-squared is basically zero.
+
+##### Sentiment {#sent}
+
+```{r}
+fit = lm(Rank~Sentiment,data=data)
+summary(fit)
+```
+
+Since none of my lyrics columns are good predictors of Rank, I think that using a classification model to predict genres from lyrics might prove more viable than a regression on rank.
+
+#### Genre {#genre}
+
+Next, let's use genre as the variable we are trying to predict.
+
+```{r definition,include=F}
+rap <- function(genre) {
+  l = c("rap","hiphop","hip hop","hip-hop")
+  return(genre %in% l)
+}
+```
+
+
+```{r eval=T, include=F}
+tags = read.csv("genres.csv",header=T)
+
+list = c("rock","folk","country","/^hip*[a-z]./","soul","r&b","classic rock",
+         "smooth jazz","jazz","garage rock","punk","metal","folk rock","british",
+         "surf","fip","rap","hip hop","rnb","indie","indie rock",
+         "pop rock","soft rock","psychadelic","psychadelic","rock","electronic",
+         "synth pop","dance","funk","reggae","progressive rock","punk rock",
+         "hip-hop","love","hiphop","house","pop")
+
+
+# Find tags that match to those in list and put in genre column
+genres = tags %>% 
+  mutate(genre = ifelse(str_trim(tolower(Tag1)) %in% list, str_trim(tolower(Tag1)),
+                 ifelse(str_trim(tolower(Tag2)) %in% list, str_trim(tolower(Tag2)),
+                 ifelse(str_trim(tolower(Tag3)) %in% list, str_trim(tolower(Tag3)),
+                 ifelse(str_trim(tolower(Tag4)) %in% list, str_trim(tolower(Tag4)),
+                 ifelse(str_trim(tolower(Tag5)) %in% list, str_trim(tolower(Tag5)),9999))))))  %>% 
+  select(genre)
+
+
+old = read.csv("data_and_feature.csv",header=T)
+data_genres = cbind(old,genres) %>% mutate(track = paste(Song,Artist,sep=" "))
+  
+clean_full = data_genres[data_genres$genre != 9999,] %>% 
+  mutate(genre = ifelse(rap(genre),"rap",genre),
+         track = paste(Song,Artist,sep = " ")) %>%
+  filter(track %in% data$track)
+
+write.csv(clean_full,file="data_oct23.csv")
+```
+
+Due to the nature of the API, I ended up dropping around 187 songs, but that leaves us with 3931 rows of song data, genre included. Lets look at the spread of the genres.
+
+```{r}
+num_genre = clean_full %>% group_by(genre) %>% summarise(count=n()) %>% select(genre,count)
+
+genreplot = num_genre[num_genre$count > 20,] %>%
+  ggplot(., aes(x=genre, y=count, fill=genre)) +
+  geom_bar(stat="identity")+theme_minimal()+ 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = 'none')
+
+genreplot
+```
+
+There are about 1200 pop songs, but pop is such a wide ranging genre that this should be somewhat expected. Other than pop, it seems that these 17 genres are pretty all-representing.
+
+This cleans the genres with under 20 songs and creates binary columns representing the 17 genres.
+
+```{r}
+genre_list = num_genre[num_genre$count > 20,] %>% mutate(X = row_number())
+
+clean_cut = clean_full[clean_full$genre %in% genre_list$genre,] %>% 
+  mutate(X = row_number())
+
+
+binary = as.data.frame(clean_cut %>% select(X,genre) %>% model.matrix(~.,data=.))
+
+final_data = right_join(clean_cut,binary,by="X",keep=F)
+colnames(final_data)
+head(final_data$Loudness)
+```
+
+
+Now that we have our genre columns, we can try to predict the genre from the different independent variables.
+
+##### Predicting Pop songs {#pop}
+
+First lets try just the lyric data.
+
+```{r}
+pop = final_data %>% select(genrepop,
+                            Rank,
+                            AverageWordLength,
+                            AverageRhymeLength,
+                            NumberWords,
+                            UniqueWords,
+                            Sentiment)
+
+fit = glm(genrepop ~ Rank + 
+            AverageWordLength + 
+            AverageRhymeLength + 
+            NumberWords + 
+            UniqueWords + 
+            Sentiment,data=pop,family = "binomial")
+
+summary(fit)
+```
+
+From this it seems like Number of Words, Unique Words, and Rank are all significant. Let's drop the insignificant variables.
+
+```{r}
+pop = pop %>% select(Rank,genrepop,NumberWords,UniqueWords)
+
+fit = glm(genrepop ~ Rank + NumberWords + UniqueWords,data=pop,family=binomial)
+summary(fit)
+```
+
+And let's then create a confusion matrix.
+
+```{r}
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Pop",nrow(pop))
+prediction[probs > .5]="Pop"
+real = recode(pop$genrepop,"1"="Pop","0"="Not Pop")
+table(prediction,real)
+```
+
+The confusion matrix tells us that the model predicts that a song is not pop very accuratly, but seems unable to predict when a song is pop. Let's see if this is the case for other genres too.
+
+##### Predicting Rock Songs {#rock}
+
+Using the same logic from above, here is the fit summary for predicting whether a song is rock or not.
+
+```{r}
+rock = final_data %>% select(genrerock,
+                             Rank,
+                             AverageWordLength,
+                             AverageRhymeLength,
+                             NumberWords,
+                             UniqueWords,
+                             Sentiment)
+
+fit = glm(genrerock ~ Rank + 
+            AverageWordLength + 
+            AverageRhymeLength + 
+            NumberWords + 
+            UniqueWords + 
+            Sentiment,data=rock,family = "binomial")
+
+summary(fit)
+```
+
+Interestingly, there are different significant variables. Rank and Number of Words are the same, but this time sentiment is significant. What is interesting is that the coefficient for sentiment is much larger than any other variable from rock or pop.
+
+```{r}
+rock = rock %>% select(Rank,genrerock,NumberWords,Sentiment)
+
+fit = glm(genrerock ~ Rank + NumberWords + Sentiment,data=rock,family=binomial)
+summary(fit)
+```
+
+And let's then create a confusion matrix.
+
+```{r}
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Rock",nrow(rock))
+prediction[probs > .5]="Rock"
+real = recode(rock$genrerock,"1"="Rock","0"="Not Rock")
+table(prediction,real)
+unique(prediction)
+```
+
+The last function I call is to prove that the model only predicts "Not Rock" (0) for any input in the data set. Due to that, the model can't be a good predictor if it can't predict that a rock song is a rock song. I'm going to remove pop songs from the data set to see if it helps.
+
+```{r}
+notPop = final_data[final_data$genrepop == 0,]
+
+rock = notPop %>% select(genrerock,
+                         Rank,
+                         AverageWordLength,
+                         AverageRhymeLength,
+                         NumberWords,
+                         UniqueWords,
+                         Sentiment)
+
+fit = glm(genrerock ~ Rank + NumberWords + Sentiment, data=rock,family = binomial)
+summary(fit)
+
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Rock",nrow(rock))
+prediction[probs > .5]="Rock"
+real = recode(rock$genrerock,"1"="Rock","0"="Not Rock")
+table(prediction,real)
+unique(prediction)
+```
+
+This time, the model predicted "Rock" (1) one time, which was a false positive. I'll consider this model bust.
+
+##### Predicting Audio Analysis {#aa}
+
+Now I am going to incorporate results from my Spotify API into these logisitc regressions. Hip-Hop is my favorite type of music, and tends to have pretty unique musical traits, so I'll use rap as a prediction variable out of non-pop songs.
+
+```{r}
+aa = final_data[(final_data$Loudness != 9999) && (final_data$Tempo != 9999),]
+
+fit = glm(genrepop ~ UniqueWords + Loudness:Tempo,data=aa,family = binomial)
+summary(fit)
+```
+
+Both variables are signficantly different from 0 but their coefficients are so small that any change in the variable has negligible effect. It is interesting that unique words has a negetive coefficient, though. Maybe because Pop songs often repeat the same phrase or word often. 
+
+And the confusion table.
+
+
+```{r}
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Pop",
+                 nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
+
+prediction[probs > .5]="Pop"
+real = recode(aa$genrepop,"1"="Pop","0"="Not Pop")
+table(prediction,real)
+```
+
+```{r}
+# Percent Correct
+mean(prediction==real)
+
+# False Positive Rate
+20/23
+
+# True Positive Rate
+2540/2560
+```
+
+
+For the sake of shortness, I ran a bunch of different combinations and this is the best I could predict. The model rarely predicts that a song is "Pop", but has a high false positive rate. Because the model mostly outputs "Not Pop" it has a high true positive rate - 66% of the data was "Not Pop".
+
+
+##### Standard Errors {#se}
+
+As I mentioned above, the coefficients are very small, though significantly different from zero.
+
+```{r}
+dwplot(fit,vline = geom_vline(xintercept = 0, colour = "grey60", linetype = 2))
+```
+
+##### Probit Regression {#pr}
+
+Here is a probit regression for comparison.
+
+```{r}
+fit = glm(genrepop ~ UniqueWords + Loudness:Tempo,
+          data=aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),],
+          family = binomial(link="probit"))
+
+
+probs = predict(fit,type="response")
+prediction = predict(fit)
+prediction = rep("Not Pop",nrow(aa[(aa$Loudness != 9999)&&(aa$Tempo != 9999),]))
+prediction[probs > .5]="Pop"
+real = recode(aa$genrepop,"1"="Pop","0"="Not Pop")
+table(prediction,real)
+```
+
+It seems that the coefficients in the probit regression are different from the logit, but still so small that they are mostly negligible.
+
+### Conclusions {#conc2}
+
+I had hoped that the results with the new independent columns would be better predictors of genre, but it seems that my data is not well enough suited to predict anything from the data. 
+
+I'm not really sure where I'll go from here, but I think I can find ways to better predict genre or rank.
+
+\newpage
+
+## Report 3 {#Report3}
+
+### Introduction {#intro3}
+
+```{r include=F}
+# Read in most current data and remove junk columns
+current_data = read.csv("data_Oct23.csv",header=T) %>% select(-c(1,2,3,4)) %>%
+  filter(Loudness != 9999) # remove rows where spotify couldn't find track
+colnames(current_data)
+dim(current_data)
+```
+
+This data has less than half of the observations as the complete dataset, but looking at the histogram of genres, we should have enough to perform classification of pop songs.
+
+```{r}
+num_genre = current_data %>% group_by(genre) %>% 
+  summarise(count=n()) %>% 
+  select(genre,count)
+
+genreplot = num_genre[num_genre$count > 20,] %>%
+    ggplot(., aes(x=genre, y=count, fill=genre)) +
+    geom_bar(stat="identity")+theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = 'none')
+
+genreplot
+```
+
+I already ran ridge and lasso models on a linear regression trying to predict Rank. Here's the prediction results plotted against the actual for both.
+
+```{r echo=F}
+
+train_ = current_data %>% select(genre,Rank,c(8:18)) %>% sample_frac(0.6) 
+test_ = current_data %>% select(genre,Rank,c(8:18)) %>% setdiff(train_)
+
+tr = train_ %>% select(-c(genre))
+te = test_ %>% select(-c(genre))
+
+x = model.matrix(Rank~., tr)[,-1]
+y = tr$Rank
+grid = 10^seq(10, -2, length = 100)
+
+set.seed(1)
+ridge_cv.out = cv.glmnet(x,y, alpha = 0)
+bestlam = ridge_cv.out$lambda.1se
+
+x_train = model.matrix(Rank~., tr)[,-1] 
+x_test = model.matrix(Rank~., te)[,-1]
+y_train = tr$Rank
+y_test = te$Rank
+
+ridge_pred = predict(ridge_cv.out, s = bestlam, newx = x_test)
+
+ridge_plot = ggplot() +
+  geom_point(aes(x = te$Rank, y = ridge_pred),
+             colour = 'blue') +
+  geom_line(aes(x = te$Rank, y = te$Rank),
+            colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
+  ggtitle('ridge predictions vs salary') +
+  xlab('actual y') + ylab('predicted y')
+
+
+lasso_cv.out = cv.glmnet(x,y, alpha = 1)
+bestlam = lasso_cv.out$lambda.1se
+
+x_train = model.matrix(Rank~., tr)[,-1] 
+x_test = model.matrix(Rank~., te)[,-1]
+y_train = tr$Rank
+y_test = te$Rank
+
+lasso_pred = predict(lasso_cv.out, s = bestlam, newx = x_test)
+
+lasso_plot = ggplot() +
+  geom_point(aes(x = te$Rank, y = lasso_pred),
+             colour = 'blue') +
+  geom_line(aes(x = te$Rank, y = te$Rank),
+            colour = 'red') + # plotting Y againts itself produces a red 45 degree line 
+  ggtitle('ridge predictions vs salary') +
+  xlab('actual y') + ylab('predicted y')
+
+
+grid.arrange(ridge_plot,lasso_plot,ncol=2)
+```
+
+Obviously, Rank is not going to work for any kind of regression. I think it's due the to fact that Rank is uniformly distributed. The models can minimize their RSS and objective functions by setting the intercept to 50 and the coefficients to such small numbers that the prediction will always be around 50. It's unfortunate, hopefully non-linear models will work better.
+
+Either way, I used a classification variable for the ridge and lasso models.
+
+### Question 1. Validation and Training Sets {#q1}
+
+I let my training data include the majority of the data. Here's the distribution of genres among the two sets.
+
+```{r}
+train_ = current_data %>% 
+  select(genre,Rank,c(8:18)) %>% 
+  sample_frac(0.6) 
+test_ = current_data %>% 
+  select(genre,Rank,c(8:18)) %>% 
+  setdiff(train_)
+par(mfrow=c(2,1))
+
+train_genres = train_ %>% group_by(genre) %>% 
+  summarise(count=n()) %>% 
+  filter(count > 20) %>%
+    ggplot(., aes(x=genre, y=count, fill=genre)) +
+    geom_bar(stat="identity")+theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = 'none') +
+    ggtitle("Distribution of Genres in Train Data")
+
+test_genres = test_ %>% group_by(genre) %>% 
+  summarise(count=n()) %>% 
+  filter(count > 20) %>%
+    ggplot(., aes(x=genre, y=count, fill=genre)) +
+    geom_bar(stat="identity")+theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1),
+          legend.position = 'none') +
+    ggtitle("Distribution of Genres in Test Data")
+
+grid.arrange(train_genres, test_genres, ncol=2)
+```
+
+This following chunk creates a binary column for whether a song is of genre "Pop" or not. I use "-1" instead of "0" for better results.
+
+```{r include=T}
+train_$IsPop = ifelse(train_$genre == "pop",1,-1)
+test_$IsPop = ifelse(test_$genre == "pop",1,-1)
+```
+
+
+### Question 2. Ridge and Lasso Regressions. {#q2}
+
+Given that Rank proves to be unpredictable through linear models, I will preform ridge and lasso regressions on the binary variable, IsPop.
+
+```{r include=F}
+train = train_ %>% select(-c(genre,Rank))
+test = test_ %>% select(-c(genre,Rank))
+```
+
+#### Ridge Regression {#ridge}
+
+##### Question 2a. Tuning the model. {#r2a}
+
+```{r}
+x = model.matrix(IsPop~., train)[,-1]
+y = train$IsPop
+grid = 10^seq(10, -2, length = 100)
+
+ridge.cv = cv.glmnet(x,y,alpha=0)
+```
+
+After running the cross-validated model, the $\lambda$ that minimizes the RSS/objective function is:
+
+```{r echo=F}
+bestlam = ridge.cv$lambda.min
+bestlam
+```
+
+##### Question 2b. The Truly Best Lambda {#r2b}
+
+In practice, we use the best lambda 1 standard error away from the minimum $\lambda$.
+
+```{r}
+bestlam = ridge.cv$lambda.1se
+bestlam
+```
+
+Honestly, it strikes me as odd that the two $\lambda$'s are so far apart. I wonder why.
+
+##### Question 2c. Cross-Validation and the Truly Best Lambda {#r2c}
+
+```{r}
+plot(ridge.cv)
+```
+
+Well that would be why.
+
+##### Question 2d. Coefficients {#r2d}
+
+Running a normal Ridge Regression, here's how the coefficients vary as $\lambda$ increases:
+
+```{r}
+ridge = glmnet(x,y,alpha=0)
+plot(ridge,xvar="lambda")
+```
+
+
+##### Question 2e. Coefficients of the Best Lambda{#r2e}
+
+And here are the coefficients for the $\lambda$ one SE from the minimum $\lambda$: 
+
+```{r}
+predict(ridge.cv, type = "coefficients", s = bestlam)
+```
+
+##### Question 2f. Testing the Model {#r2f}
+
+Using the Test subset to generate predictions from the model, we can generate the truth table of the model.
+
+```{r}
+x_train = model.matrix(IsPop~., train)[,-1] 
+x_test = model.matrix(IsPop~., test)[,-1]
+y_train = train$IsPop
+y_test = test$IsPop
+
+
+ridge_pred = predict(ridge.cv, s = bestlam, newx = x_test)
+prediction = rep("Not Pop",nrow(ridge_pred))
+prediction[ridge_pred > 0]="Pop"
+real = recode(test$IsPop,"1"="Pop","-1"="Not Pop")
+table(prediction,real)
+```
+
+If you remember the second report, I ran into this issue, where the model only predicts "Not Pop". Hopefully Lasso might prove more helpful.
+
+In comparison to my Logit regressions, I get the same outcome, so comparing them seems uneccessary.
+
+#### Lasso Regression {#yeehaw}
+
+Using the same binary column, IsPop, let's see if a Lasso model proves more useful.
+
+##### Question 2a. Tuning the model. {#l2a}
+
+```{r}
+x = model.matrix(IsPop~., train)[,-1]
+y = train$IsPop
+grid = 10^seq(10, -2, length = 100)
+
+lasso.cv = cv.glmnet(x,y,alpha=1)
+```
+
+After running the cross-validated model, the $\lambda$ that minimizes the RSS/objective function is:
+
+```{r echo=F}
+bestlam = lasso.cv$lambda.min
+bestlam
+```
+
+##### Question 2b. The Truly Best Lambda {#l2b}
+
+In practice, we use the best lambda 1 standard error away from the minimum $\lambda$.
+
+```{r}
+bestlam = lasso.cv$lambda.1se
+bestlam
+```
+
+Again, these $\lambda$s are strange, this time they are incredibly close together, but very small.
+
+##### Question 2c. Cross-Validation and the Truly Best Lambda {#l2c}
+
+```{r}
+plot(lasso.cv)
+```
+
+I'm curious why there is a bump just before the minimum $\lambda$, but this plot does explain why the $\lambda$s are so small, the minimizing $\lambda$ is ~$e^{-3}$ and the $\lambda$ 1 SE from the minimum is not much larger.
+
+##### Question 2d. Coefficients {#l2d}
+
+Running a normal Ridge Regression, here's how the coefficients vary as $\lambda$ increases:
+
+```{r}
+lasso = glmnet(x,y,alpha=1)
+plot(ridge,xvar="lambda")
+```
+
+
+##### Question 2e. Coefficients of the Best Lambda {#l2e}
+
+And here are the coefficients for the $\lambda$ one SE from the minimum $\lambda$: 
+
+```{r}
+predict(lasso.cv, type = "coefficients", s = bestlam)
+```
+
+Well. That's... I'm not sure what I expected, but this isn't to far from it. I'll finish the rest of the section, but everything else I do from here will be meaningless (because the model only includes the intercept).
+
+
+##### Question 2f. Testing the Model {#l2f}
+
+Using the Test subset to generate predictions from the model, we can generate the truth table for the model.
+
+```{r}
+x_train = model.matrix(IsPop~., train)[,-1] 
+x_test = model.matrix(IsPop~., test)[,-1]
+y_train = train$IsPop
+y_test = test$IsPop
+
+
+lasso_pred = predict(lasso.cv, s = bestlam, newx = x_test)
+lasso_prediction = rep("Not Pop",nrow(lasso_pred))
+lasso_prediction[lasso_pred > 0]="Pop"
+real = recode(test$IsPop,"1"="Pop","-1"="Not Pop")
+table(lasso_prediction,real)
+```
+
+This is actually funny. The coefficients of the ridge model are so negligible that if you didn't factor them in, the predictions wouldn't change. I know this because we can run the following code to show the predictions are the same for the intercept-only lasso model and the ridge model.
+
+```{r}
+unique(prediction == lasso_prediction)
+```
+
+So linear models prove useless for predicting Rank and IsPop. Next, our first non-linear model, binary trees! 
+
+### Question 3. Decision Tree {#q3}
+
+I've run both of the following trees many times. Sometimes the algorithm never splits and leaves me with an empty tree, other times it splits by 5 or 6 variables. I'll write the following assuming the trees are non-empty.
+
+#### The Tree {#TREE}
+
+First to create our tree. I'm going to try to predict IsPop.
+
+#### Question 3a. Pruning the Tree {#TREEa}
+
+```{r}
+tree_train = train_ %>% select(-c(Rank,genre))
+tree_train$IsPop = as.factor(ifelse(tree_train$IsPop >= 0, "Pop","Not Pop"))
+tree_test = test_ %>% select(-c(Rank,genre))
+tree_test$IsPop = as.factor(ifelse(tree_test$IsPop >= 0, "Pop","Not Pop"))
+
+t2 = tree(IsPop ~ .,data = tree_train)
+summary(t2)
+```
+
+Hey this model has a split! Let's see if it can predict anything!
+
+```{r}
+tree_pred = predict(t2, tree_test, type = "class")
+table(tree_pred, tree_test$IsPop)
+```
+
+Not terrible, I think.
+
+#### Question 3b. Plotting the Pruned Tree {#sad}
+
+```{r}
+t2_pruned = tryCatch(cv.tree(t2,FUN=tree.prune,K = 10),
+         warning=NULL,
+         error = function(e) {print(e)},
+         finally= NULL)
+
+if(length(t2_pruned) <= 2 | is.null(t2_pruned)) {
+  print("Tree is illigitimate, whatever that means")
+} else {
+  plot(t2_pruned) + text(t2_pruned,pretty = 0)
+}
+```
+
+I'm not sure, but I keep getting an error saying that the tree is not a "legitimate" tree. I'll use the if statement to catch it, hopefully the tree is legitimate.
+
+I've been getting different splits on the second tree everytime I run, so I'll still do the extra credit, even if it's seemingly pointless. Hopefully reading this has been more fun than writing it haha.
+:(.
+
+### Extra Credit {#ec}
+```{r}
+tree_gen = function(data,indices) {
+  d = data[indices,]
+  t = tree(IsPop ~ .,data=d)
+  t_pred = predict(t,d,type="class")
+  correct = sum(t_pred == d[,"IsPop"])
+  return(correct/nrow(d))
+}
+```
+
+Using the above function as the statistic in the bootstrap, we can generate 100 trees to find the aggregated error rate.
+
+```{r}
+d = current_data %>% 
+  mutate(IsPop = ifelse(genre == "pop","Pop","Not Pop")) %>% 
+  select(IsPop,c(8:18))
+d$IsPop = as.factor(d$IsPop)
+boot = boot::boot(d,statistic=tree_gen,R=100)
+boot$t0
+```
+
+So a bootstrap of my model has an error rate of 67%. I'm actually shocked. Compared this error rate to my single tree from above, it is signficantly better. I'm not convinced, however, that the 67% of correct predictions are due to the model being correct -- I think that the sampling with replacement leads to higher proportions of "Not Pop" songs and the model still isn't predicting anything but "Not Pop". I'm not sure how to pursue this, I'll probably leave it for next time.
+
+### Conclusions {#conc3}
+
+I'm not sure how much hope I have for random forest or bagging, but hopefully they prove more helpful than everything above. I was hoping that this project would have more interesting results, but it seems that this kind of machine learning is not proficient at these kind of estimations.
+
+
+## Report 4 {#report4}
+
+
+### Introduction {#intro4}
+
+In hopes of finding more interesting results, I've added a column indicating whether a given artist is a "Top Artist." I defined a top artist by an artist who has multiple Top-10 ranking songs. Out of 185 Top-10 songs, there are 23 different artists who appear more than once. Hopefully I can use this column to produce more predictive results. 
+
+```{r}
+data = read.csv("data_oct23.csv",header = T) %>% 
+  select(-1) %>% 
+  filter(Loudness != 9999)
+
+top_artists = data[data$Rank <= 10,] %>% 
+  select(Artist) %>% 
+  group_by(Artist) %>%
+  summarise(n = n()) %>%
+  filter(n > 1) %>%
+  pull(Artist)
+
+data_topartist = data %>% 
+  mutate(isTopArtist = ifelse(Artist %in% top_artists,1,0))
+```
+
+
+### Question 1. {#t4q1}
+
+```{r}
+set.seed(1)
+train = data_topartist %>% 
+  select(-c(1:4,6:10,track,isTopArtist,genre)) %>%
+  sample_frac(.7)
+test = data_topartist %>% 
+  select(-c(1:4,6:10,track,isTopArtist,genre)) %>%
+  setdiff(train)
+```
+
+### Question 2. {#t4q2}
+
+```{r}
+bag = randomForest(Rank ~., data=train, 
+                          mtry=ncol(train)-1, 
+                          importance=TRUE,
+                          ntree=400)
+```
+
+#### Question 2a. {#t4q2a}
+
+```{r}
+plot(bag)
+```
+
+#### Question 2b. {#t4q2b}
+
+```{r}
+pred = predict(bag,newdata = test)
+
+ggplot() + 
+    geom_point(aes(x = test$Rank, y = pred)) +
+    geom_abline() +
+    labs(x="Median value", y="Bagging estimation of median value")
+```
+
+Yikes, it's not great.
+
+#### Question 2c. {#t4q2c}
+
+```{r}
+round(mean((pred-test$Rank)^2),2)
+```
+
+I used a classification model for the Lasso/Ridge models above, but after trying a classification for this report, I found that my results were the same, where the models only predict one side of the classification. From the above graph, I can safely guess that the results of this bagging model and the Lasso/Ridge models are all equally garbage.
+
+#### Question 2d. {#t4q2d}
+
+```{r}
+varImpPlot(bag)
+```
+
+For as garbage the model is, it is pretty interesting to see which variables are deemed more "important" by the algorithm. It seems odd to me that Tempo is the bottom of the left-hand graph and yet the top of the right-hand side.
+
+### Question 3. {#t4q3}
+
+#### Question 3a and b. {#t4q3a}
+
+```{r error=F}
+oob.err<-double(ncol(train)-1)
+test.err<-double(ncol(train)-1)
+for(mtry in 1:(ncol(train)-1))
+{
+  rf=randomForest(Rank ~ . , data = train, mtry=mtry, ntree=400) 
+  oob.err[mtry] = rf$mse[400] 
+  
+  pred<-predict(rf,test) 
+  test.err[mtry]= with(test, mean( (Rank - pred)^2))
+}
+
+matplot(1:mtry , cbind(oob.err,test.err), pch=20 , col=c("red","blue"),type="b",ylab="Mean Squared Error",xlab="Number of Predictors Considered at each Split")
+legend("bottomright",legend=c("Out of Bag Error","Test Error"),pch=19, col=c("red","blue"))
+```
+
+Uhhhhh, I'm fairly sure that they're not meant to increase, but I guess this follows the trend of my reports haha. I'll use mtry$=7$ as my best model because I don't think 1 is my best option...
+
+```{r}
+rf=randomForest(Rank ~ . , data = train, mtry=7, ntree=400) 
+```
+
+
+#### Question 3c. {#t4q3c}
+
+```{r}
+pred<-predict(rf,test)
+
+plot = ggplot() + 
+    geom_point(aes(x = test$Rank, y = pred)) +
+    geom_abline() +
+    labs(x="Median value", y="Random Forest estimation of median value")
+plot
+```
+
+Very similar to the bagging result, though perhaps that shouldn't be a surprise.
+
+#### Question 3d. {#t4q3d}
+
+```{r}
+round(mean((test$Rank-pred)^2),2)
+```
+
+Much like the above graph and bagging results, this model sucks.
+
+#### Question 3e. {#t4q3e}
+
+```{r}
+varImpPlot(rf)
+```
+
+It seems that the important variables in the randomForest are similar to the important variables in the bagging results, which, I guess, shouldn't be too surprising either.
+
+#### Question 3f. {#t4q3f}
+
+I plotted this above, but I'll show it again.
+
+```{r}
+plot
+```
+
+### Question 4. {#t4q4}
+
+```{r}
+boost = gbm(Rank~., 
+                   data = train, 
+                   distribution = "gaussian",
+                   n.trees = 5000, 
+                   interaction.depth = 4)
+```
+
+#### Question 4a. {#t4q4a}
+
+```{r}
+pred<-predict(boost,test,n.trees=5000)
+
+ggplot() + 
+    geom_point(aes(x = test$Rank, y = pred)) +
+    geom_abline() +
+    labs(x="Median value", y="Boosting estimation of median value")
+```
+
+oof.
+
+#### Question 4b. {#t4q4b}
+
+```{r}
+round(mean((test$Rank-pred)^2),2)
+```
+
+Wow it's actually worse than the other models. Unless I'm mistaken, I thought boosting was supposed to be the best model out of all the previous tree models. Was it because we didn't tune it?
+
+#### Question 4c. {#t4q4c}
+
+```{r}
+summary(boost)
+```
+
+It's interesting that Sentiment is the most important variable, as opposed to Tempo.
+
+### Question 5. {#t4q5}
+
+```{r}
+Y_train <- as.matrix(train[,"Rank"])
+X_train <- as.matrix(train[!names(train) %in% c("Rank")])
+dtrain <- xgb.DMatrix(data = X_train, label = Y_train)
+
+X_test <- as.matrix(test[!names(train) %in% c("Rank")])
+
+xgboost = xgboost(data=dtrain,
+                     max_depth=5,
+                     eta = 0.1,
+                     nrounds=40,
+                     lambda=0,
+                     print_every_n = 10,
+                     objective="reg:linear")
+```
+
+#### Question 5a. {#t4q5a}
+
+```{r}
+pred = predict(xgboost ,X_test)
+
+ggplot() + 
+    geom_point(aes(x = test$Rank, y = pred)) +
+    geom_abline() +
+    labs(x="Median value", y="XGboosting estimation of median value")
+```
+
+Hey wait that looks somewhat better than the previous graphs, though still underwhelming.
+
+#### Question 5b. {#t4q5b}
+
+```{r}
+round(mean((pred - test$Rank)^2),2)
+```
+
+Well, it's lower than the regular boosting MSE, but still not significantly less than any of the other models.
+
+#### Question 5c. {#t4q5c}
+
+```{r}
+importance <- xgb.importance(colnames(X_train),model=xgboost)
+xgb.plot.importance(importance, rel_to_first=TRUE, xlab="Relative Importance")
+```
+
+Oh that's actually interesting that AverageWordLength takes the most important variable spot from Tempo/Sentiment. My sneaking suspicion is that the models are so inconsistent of predictors that the true difference in importance of each variable is so slim that the most important variable is not much more important than the least important.
+
+### Conclusion {#t4conc}
+
+I'm going to not attempt the extra credit, I'm just tired of seeing my models fail haha. Even though my data seems unhelpful, this class has been very fun and one of my favorites and the subject material is definetly very interesting. Even if I never produce a predictive model, I do get a lot out of taking this class and writing these reports, so ultimately, I'm not sad, just disappointed.
+
+## Neural Nets
+
+```{r}
+train_labels <- as.matrix(train[,"Rank"])
+train_data <- as.matrix(train[!names(train) %in% c("Rank")])
+test_data <- as.matrix(test[!names(train) %in% c("Rank")]) 
+test_labels <- as.matrix(test[,"Rank"])
+
+train_data <- scale(train_data) 
+test_data <- scale(test_data)
+
+model <- keras_model_sequential() %>%
+  layer_dense(units = 64, activation = "relu",
+              input_shape = dim(train_data)[2]) %>% 
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 1)
+
+model %>% compile(
+  loss = "mse",
+  optimizer = optimizer_rmsprop(),
+  metrics = list("mean_absolute_error")
+)
+
+summary(model)
+
+epochs <- 200
+history <- model %>% fit(
+  train_data,
+  train_labels,
+  epochs = epochs,
+  validation_split = 0.2
+)
+
+plot(history, metrics = "mean_absolute_error", smooth = FALSE) +
+  coord_cartesian(ylim = c(0, 5))
+```
+
+
+
+
+
